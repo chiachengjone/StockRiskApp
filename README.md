@@ -1,4 +1,4 @@
-# Stock Risk Analysis App 📊
+# Stock Risk Analysis App 
 
 A professional-grade **Stock Risk Modeling & Portfolio Analysis** web application built with Streamlit, featuring advanced quantitative risk metrics, AI-powered predictions, and stress testing capabilities.
 
@@ -6,7 +6,7 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 ![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-## 🚀 Features
+## Features
 
 ### Single Stock Analysis
 - **Value at Risk (VaR)** - Multiple methods: Parametric (Normal & t-distribution), Historical, Monte Carlo
@@ -36,7 +36,7 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 - **Cryptocurrencies** - BTC, ETH, SOL, ADA, XRP
 - **Benchmarks** - S&P 500, NASDAQ, Dow Jones, VIX, international indices
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 - Python 3.8 or higher
@@ -62,7 +62,7 @@ streamlit run stock_risk_app.py
 
 The app will open automatically in your default browser at `http://localhost:8501`
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: Streamlit (interactive web UI)
 - **Data**: yfinance (Yahoo Finance API)
@@ -75,7 +75,7 @@ The app will open automatically in your default browser at `http://localhost:850
 - **Factor Models**: Fama-French 5-Factor (via pandas-datareader)
 - **Optimization**: scipy.optimize (Mean-Variance portfolio optimization)
 
-## 📊 Key Modules
+## Key Modules
 
 ### `stock_risk_app.py`
 Main Streamlit application with UI components and workflow orchestration.
@@ -102,7 +102,7 @@ Factor analysis & advanced metrics:
 - ESG rating integration
 - Performance attribution
 
-## 🎯 Use Cases
+## Use Cases
 
 1. **Risk Management** - Quantify portfolio risk with institutional-grade metrics
 2. **Position Sizing** - Kelly Criterion for optimal capital allocation
@@ -111,7 +111,7 @@ Factor analysis & advanced metrics:
 5. **ESG Screening** - Incorporate sustainability ratings into investment decisions
 6. **Backtesting** - Compare strategy performance against benchmarks
 
-## 📈 Screenshots
+## Screenshots
 
 ### Single Stock Analysis
 - Real-time price charts with technical indicators
@@ -125,7 +125,7 @@ Factor analysis & advanced metrics:
 - Efficient frontier visualization
 - Stress test impact analysis
 
-## 🔬 Methodology
+## Methodology
 
 ### Value at Risk (VaR)
 ```
@@ -150,7 +150,7 @@ f* = (p × b - q) / b
 where p = win probability, q = loss probability, b = win/loss ratio
 ```
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This application is for **educational and research purposes only**. It should not be considered financial advice. Always consult with a qualified financial advisor before making investment decisions.
 
@@ -159,11 +159,11 @@ This application is for **educational and research purposes only**. It should no
 - Market conditions can change rapidly
 - Use at your own risk
 
-## 📝 License
+## License
 
 MIT License - feel free to use and modify for your projects.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -179,7 +179,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - GitHub: [@chiachengjone](https://github.com/chiachengjone)
 - Repository: [StockRiskAnalysis](https://github.com/chiachengjone/StockRiskAnalysis)
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Yahoo Finance for market data API
 - Kenneth French Data Library for factor data
