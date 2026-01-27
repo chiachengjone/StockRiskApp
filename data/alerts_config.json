@@ -1,0 +1,22 @@
+{
+  "email": "chiachengjone@u.nus.edu",
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "email_enabled": true,
+  "alerts": [
+    {
+      "id": 1,
+      "ticker": "AAPL",
+      "metric": "var",
+      "threshold": 0.05,
+      "direction": "above",
+      "name": "AAPL var above 0.05",
+      "active": true,
+      "created_at": "2026-01-28T03:48:48.255530",
+      "last_triggered": null,
+      "trigger_count": 0
+    }
+  ],
+  "history": [],
+  "email_password": "Kimichiwa"
+}

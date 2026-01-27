@@ -19,17 +19,33 @@ from arch import arch_model
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import new modules (optional - graceful fallback)
+try:
+    from data_sources import DataAggregator, YahooProvider, AlphaVantageProvider
+    HAS_DATA_LAYER = True
+except ImportError:
+    HAS_DATA_LAYER = False
+
+try:
+    from config.settings import STRESS_SCENARIOS as CONFIG_SCENARIOS
+except ImportError:
+    CONFIG_SCENARIOS = None
+
 # ============================================================================
 # STRESS SCENARIOS
 # ============================================================================
-STRESS_SCENARIOS = {
-    "Black Monday 1987": {"market_shock": -0.20, "vol_multiplier": 3.0, "description": "Oct 19, 1987: -20% single day"},
-    "Dot-com Crash 2000": {"market_shock": -0.45, "vol_multiplier": 2.0, "description": "2000-2002: Tech bubble burst"},
-    "GFC 2008": {"market_shock": -0.50, "vol_multiplier": 4.0, "description": "2008: Lehman collapse, -50% peak-trough"},
-    "COVID Crash 2020": {"market_shock": -0.35, "vol_multiplier": 5.0, "description": "Mar 2020: Fastest 30% drop ever"},
-    "Mild Correction": {"market_shock": -0.10, "vol_multiplier": 1.5, "description": "Typical 10% pullback"},
-    "Severe Bear": {"market_shock": -0.30, "vol_multiplier": 2.5, "description": "Extended bear market"},
-}
+# Use config if available, otherwise fall back to defaults
+if CONFIG_SCENARIOS:
+    STRESS_SCENARIOS = CONFIG_SCENARIOS
+else:
+    STRESS_SCENARIOS = {
+        "Black Monday 1987": {"market_shock": -0.20, "vol_multiplier": 3.0, "description": "Oct 19, 1987: -20% single day"},
+        "Dot-com Crash 2000": {"market_shock": -0.45, "vol_multiplier": 2.0, "description": "2000-2002: Tech bubble burst"},
+        "GFC 2008": {"market_shock": -0.50, "vol_multiplier": 4.0, "description": "2008: Lehman collapse, -50% peak-trough"},
+        "COVID Crash 2020": {"market_shock": -0.35, "vol_multiplier": 5.0, "description": "Mar 2020: Fastest 30% drop ever"},
+        "Mild Correction": {"market_shock": -0.10, "vol_multiplier": 1.5, "description": "Typical 10% pullback"},
+        "Severe Bear": {"market_shock": -0.30, "vol_multiplier": 2.5, "description": "Extended bear market"},
+    }
 
 # ============================================================================
 # DATA FETCHERS
@@ -329,3 +345,210 @@ def backtest_strategy(returns: pd.Series, benchmark_returns: pd.Series) -> dict:
         'strategy_cum': strat_cum,
         'benchmark_cum': bench_cum
     }
+
+# ============================================================================
+# ROLLING METRICS (NEW)
+# ============================================================================
+def rolling_volatility(returns: pd.Series, window: int = 21) -> pd.Series:
+    """Rolling annualized volatility."""
+    return returns.rolling(window).std() * np.sqrt(252)
+
+def rolling_sharpe(returns: pd.Series, window: int = 63, rf: float = 0.0) -> pd.Series:
+    """Rolling Sharpe ratio (default: quarterly window)."""
+    rolling_ret = returns.rolling(window).mean() * 252
+    rolling_vol = returns.rolling(window).std() * np.sqrt(252)
+    return (rolling_ret - rf) / rolling_vol
+
+def rolling_var(returns: pd.Series, window: int = 252, conf: float = 0.95) -> pd.Series:
+    """Rolling historical VaR."""
+    return returns.rolling(window).apply(lambda x: np.percentile(x, 100*(1-conf)), raw=True)
+
+def rolling_beta(stock_rets: pd.Series, bench_rets: pd.Series, window: int = 63) -> pd.Series:
+    """Rolling beta coefficient."""
+    aligned = pd.DataFrame({'stock': stock_rets, 'bench': bench_rets}).dropna()
+    
+    def calc_beta(window_data):
+        if len(window_data) < 20:
+            return np.nan
+        cov = np.cov(window_data['stock'], window_data['bench'])[0, 1]
+        var = np.var(window_data['bench'])
+        return cov / var if var > 0 else 0
+    
+    # Calculate rolling beta manually
+    betas = []
+    for i in range(len(aligned)):
+        if i < window:
+            betas.append(np.nan)
+        else:
+            window_data = aligned.iloc[i-window:i]
+            cov = np.cov(window_data['stock'], window_data['bench'])[0, 1]
+            var = np.var(window_data['bench'])
+            betas.append(cov / var if var > 0 else 0)
+    
+    return pd.Series(betas, index=aligned.index)
+
+def rolling_max_drawdown(returns: pd.Series, window: int = 252) -> pd.Series:
+    """Rolling maximum drawdown."""
+    cum_ret = (1 + returns).cumprod()
+    
+    def calc_dd(window_prices):
+        running_max = np.maximum.accumulate(window_prices)
+        drawdowns = (window_prices - running_max) / running_max
+        return np.min(drawdowns)
+    
+    return cum_ret.rolling(window).apply(calc_dd, raw=True)
+
+def get_rolling_metrics_df(returns: pd.Series, bench_returns: pd.Series = None) -> pd.DataFrame:
+    """Get all rolling metrics as DataFrame."""
+    df = pd.DataFrame(index=returns.index)
+    
+    df['rolling_vol_21d'] = rolling_volatility(returns, 21)
+    df['rolling_vol_63d'] = rolling_volatility(returns, 63)
+    df['rolling_sharpe'] = rolling_sharpe(returns, 63)
+    df['rolling_var'] = rolling_var(returns, 252)
+    df['rolling_max_dd'] = rolling_max_drawdown(returns, 252)
+    
+    if bench_returns is not None:
+        df['rolling_beta'] = rolling_beta(returns, bench_returns, 63)
+    
+    return df
+
+# ============================================================================
+# ENHANCED STRESS TESTING (NEW)
+# ============================================================================
+def monte_carlo_stress(returns: pd.Series, n_sims: int = 10000, 
+                       stress_factor: float = 2.0) -> dict:
+    """Monte Carlo with stressed parameters."""
+    mu = float(returns.mean())
+    sigma = float(returns.std()) * stress_factor  # Stressed volatility
+    
+    # Simulate 10-day returns
+    sim_rets = np.random.normal(mu, sigma, (n_sims, 10))
+    cum_rets = sim_rets.sum(axis=1)
+    
+    return {
+        'mean': float(np.mean(cum_rets)),
+        'std': float(np.std(cum_rets)),
+        'var_95': float(np.percentile(cum_rets, 5)),
+        'var_99': float(np.percentile(cum_rets, 1)),
+        'worst_case': float(np.min(cum_rets)),
+        'best_case': float(np.max(cum_rets)),
+        'prob_loss_10pct': float(np.mean(cum_rets < -0.10)),
+        'distribution': cum_rets
+    }
+
+def custom_stress_scenario(returns_df: pd.DataFrame, weights: np.ndarray,
+                          shocks: dict) -> dict:
+    """Apply custom shocks to each asset."""
+    results = {}
+    portfolio_impact = 0
+    
+    for i, ticker in enumerate(returns_df.columns):
+        shock = shocks.get(ticker, 0)
+        results[ticker] = {
+            'shock': shock,
+            'weighted_impact': shock * weights[i]
+        }
+        portfolio_impact += shock * weights[i]
+    
+    return {
+        'individual': results,
+        'portfolio_impact': portfolio_impact,
+        'portfolio_loss': portfolio_impact if portfolio_impact < 0 else 0
+    }
+
+def sector_stress_test(returns_df: pd.DataFrame, weights: np.ndarray,
+                       sector_mapping: dict, sector_shocks: dict) -> dict:
+    """Apply sector-based stress scenarios."""
+    results = {}
+    portfolio_impact = 0
+    
+    for i, ticker in enumerate(returns_df.columns):
+        sector = sector_mapping.get(ticker, 'Unknown')
+        shock = sector_shocks.get(sector, 0)
+        
+        results[ticker] = {
+            'sector': sector,
+            'shock': shock,
+            'weighted_impact': shock * weights[i]
+        }
+        portfolio_impact += shock * weights[i]
+    
+    return {
+        'by_asset': results,
+        'portfolio_impact': portfolio_impact
+    }
+
+# ============================================================================
+# CORRELATION ANALYSIS (NEW)
+# ============================================================================
+def rolling_correlation(returns_df: pd.DataFrame, window: int = 63) -> dict:
+    """Rolling correlation between assets."""
+    correlations = {}
+    tickers = returns_df.columns.tolist()
+    
+    for i, t1 in enumerate(tickers):
+        for t2 in tickers[i+1:]:
+            key = f"{t1}_{t2}"
+            correlations[key] = returns_df[t1].rolling(window).corr(returns_df[t2])
+    
+    return correlations
+
+def correlation_breakdown(returns_df: pd.DataFrame, 
+                         crash_threshold: float = -0.02) -> dict:
+    """Compare correlations during crashes vs normal times."""
+    # Identify crash days (market down more than threshold)
+    market_proxy = returns_df.mean(axis=1)  # Simple average
+    crash_days = market_proxy < crash_threshold
+    
+    normal_corr = returns_df[~crash_days].corr()
+    crash_corr = returns_df[crash_days].corr()
+    
+    # Average correlation
+    n = len(returns_df.columns)
+    
+    def avg_corr(corr_matrix):
+        total = 0
+        count = 0
+        for i in range(n):
+            for j in range(i+1, n):
+                total += corr_matrix.iloc[i, j]
+                count += 1
+        return total / count if count > 0 else 0
+    
+    return {
+        'normal_correlation_matrix': normal_corr,
+        'crash_correlation_matrix': crash_corr,
+        'avg_normal_correlation': avg_corr(normal_corr),
+        'avg_crash_correlation': avg_corr(crash_corr),
+        'crash_days_count': int(crash_days.sum()),
+        'total_days': len(returns_df)
+    }
+
+# ============================================================================
+# DATA LAYER INTEGRATION (NEW)
+# ============================================================================
+def get_data_aggregator():
+    """Get DataAggregator instance with fallback."""
+    if HAS_DATA_LAYER:
+        return DataAggregator()
+    return None
+
+def fetch_with_fallback(ticker: str, start: str, end: str) -> pd.DataFrame:
+    """Fetch data using new data layer with fallback to direct yfinance."""
+    aggregator = get_data_aggregator()
+    
+    if aggregator:
+        return aggregator.fetch_historical(ticker, start, end)
+    else:
+        return fetch_data(ticker, start, end)
+
+def fetch_fundamentals_enhanced(ticker: str) -> dict:
+    """Fetch enhanced fundamentals using data layer."""
+    aggregator = get_data_aggregator()
+    
+    if aggregator:
+        return aggregator.fetch_info(ticker)
+    else:
+        return fetch_info(ticker)
+

@@ -1,8 +1,9 @@
 """
-STOCK RISK MODELLING APP
-========================
-Streamlit + yfinance + GARCH + EVT + Portfolio Mode + Stress Testing
+STOCK RISK MODELLING APP v4.0
+==============================
+Streamlit + yfinance + GARCH + EVT + Monte Carlo + Portfolio Mode + Stress Testing
 + Fama-French Factors + Kelly Criterion + ESG + XGBoost AI VaR
++ Options Analytics + Fundamentals + Comparison + Alerts + PDF Reports
 """
 
 import streamlit as st
@@ -21,10 +22,28 @@ from risk_engine import (
     fit_garch, evt_tail_risk, compute_beta, mc_simulation,
     portfolio_returns, portfolio_var, marginal_var_contribution,
     optimize_portfolio, efficient_frontier, stress_test_portfolio,
-    backtest_strategy, STRESS_SCENARIOS
+    backtest_strategy, STRESS_SCENARIOS,
+    # New functions
+    rolling_volatility, rolling_sharpe, rolling_var, rolling_beta, 
+    rolling_max_drawdown, get_rolling_metrics_df, monte_carlo_stress,
+    correlation_breakdown
 )
 from factors import FactorAnalyzer
 from ml_predictor import MLPredictor
+
+# Import new modules (graceful fallback)
+try:
+    from features import AlertManager, ReportGenerator, OptionsAnalytics, FundamentalAnalyzer, StockComparison
+    from storage import PortfolioStore
+    HAS_FEATURES = True
+except ImportError:
+    HAS_FEATURES = False
+
+try:
+    from config.settings import COLORS as CONFIG_COLORS, POPULAR_STOCKS as CONFIG_STOCKS
+except ImportError:
+    CONFIG_COLORS = None
+    CONFIG_STOCKS = None
 
 # ============================================================================
 # PAGE CONFIG & STYLING
@@ -36,24 +55,33 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Apple-inspired minimal CSS
+# Custom CSS for clean, minimal design with dark theme
 st.markdown("""
 <style>
-    /* Clean, minimal typography */
+    /* Dark theme for entire app */
     .stApp {
         font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+        background-color: #0e1117 !important;
+        color: #fafafa !important;
+    }
+    
+    /* Main content background */
+    .main {
+        background-color: #0e1117 !important;
     }
     
     /* Subtle headers */
     h1, h2, h3 {
         font-weight: 500 !important;
         letter-spacing: -0.02em;
+        color: #fafafa !important;
     }
     
     /* Clean metric cards */
     [data-testid="stMetricValue"] {
         font-size: 1.4rem !important;
         font-weight: 500 !important;
+        color: #fafafa !important;
     }
     
     [data-testid="stMetricLabel"] {
@@ -61,13 +89,14 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.05em;
         opacity: 0.7;
+        color: #a0a0a0 !important;
     }
     
     /* Subtle dividers */
     hr {
         border: none;
         height: 1px;
-        background: rgba(128, 128, 128, 0.2);
+        background: rgba(255, 255, 255, 0.1);
         margin: 1.5rem 0;
     }
     
@@ -81,11 +110,17 @@ st.markdown("""
     /* Subtle tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;
+        background-color: transparent !important;
     }
     
     .stTabs [data-baseweb="tab"] {
         font-size: 0.9rem;
         font-weight: 500;
+        color: #a0a0a0 !important;
+    }
+    
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        color: #fafafa !important;
     }
     
     /* Clean dataframes */
@@ -93,14 +128,56 @@ st.markdown("""
         border-radius: 8px;
     }
     
-    /* Sidebar styling */
+    /* Dark sidebar styling */
     [data-testid="stSidebar"] {
-        background: rgba(248, 248, 248, 0.95);
+        background: #1a1d24 !important;
+    }
+    
+    [data-testid="stSidebar"] * {
+        color: #fafafa !important;
+    }
+    
+    /* Sidebar widgets */
+    [data-testid="stSidebar"] .stMarkdown {
+        color: #fafafa !important;
+    }
+    
+    /* Expander in sidebar */
+    [data-testid="stSidebar"] .streamlit-expanderHeader {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #fafafa !important;
+    }
+    
+    /* Input fields dark theme */
+    .stTextInput input, .stNumberInput input, .stSelectbox select {
+        background-color: #262730 !important;
+        color: #fafafa !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    /* Slider */
+    .stSlider {
+        color: #fafafa !important;
     }
     
     /* Remove excessive padding */
     .block-container {
         padding-top: 2rem;
+    }
+    
+    /* Caption text */
+    .caption, .stCaption {
+        color: #a0a0a0 !important;
+    }
+    
+    /* Radio buttons */
+    .stRadio label {
+        color: #fafafa !important;
+    }
+    
+    /* Checkbox/Toggle */
+    .stCheckbox label, .stToggle label {
+        color: #fafafa !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -173,8 +250,17 @@ with st.sidebar:
     theme_dark = st.toggle("Dark Charts", value=True)
     auto_refresh = st.toggle("Auto-Refresh (5min)", value=False)
     
+    # New: Alerts Section
+    if HAS_FEATURES:
+        st.divider()
+        alert_manager = AlertManager()
+        alert_summary = alert_manager.get_summary()
+        st.markdown(f"**Alerts:** {alert_summary['active_alerts']} active")
+        if alert_summary['triggered_today'] > 0:
+            st.warning(f"⚠️ {alert_summary['triggered_today']} alerts triggered today")
+    
     st.divider()
-    st.caption("v3.0")
+    st.caption("v4.0")
 
 # ============================================================================
 # ASSET DEFINITIONS
@@ -471,9 +557,9 @@ if mode == "Single Stock":
         h_var = historical_var(rets, var_horizon, conf_level)
         cv = cvar(rets, conf_level)
         
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
             "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
-            "Advanced", "Factors", "AI Risk", "Export"
+            "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Export"
         ])
         
         # TAB 1: OVERVIEW
@@ -515,6 +601,38 @@ if mode == "Single Stock":
                               template='plotly_dark' if theme_dark else 'plotly_white',
                               margin=dict(t=40, b=40, l=40, r=20))
             st.plotly_chart(fig1, use_container_width=True)
+            
+            # Rolling Metrics Section (NEW)
+            st.markdown("---")
+            st.markdown("#### Rolling Risk Metrics")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                rolling_vol = rolling_volatility(rets, 21)
+                fig_rvol = go.Figure()
+                fig_rvol.add_trace(go.Scatter(x=rolling_vol.index, y=rolling_vol.values * 100,
+                                              name='21-Day Rolling Vol', 
+                                              line=dict(color=COLORS['primary'], width=1.5)))
+                # Add long-term average
+                avg_vol = metrics['ann_vol'] * 100
+                fig_rvol.add_hline(y=avg_vol, line_dash="dash", line_color=COLORS['warning'],
+                                   annotation_text=f"Avg: {avg_vol:.1f}%")
+                fig_rvol.update_layout(title="Rolling Volatility (Annualized)", height=250,
+                                       template='plotly_dark' if theme_dark else 'plotly_white',
+                                       yaxis_title="Volatility (%)")
+                st.plotly_chart(fig_rvol, use_container_width=True)
+            
+            with col2:
+                rolling_sh = rolling_sharpe(rets, 63, rf_rate)
+                fig_rsh = go.Figure()
+                fig_rsh.add_trace(go.Scatter(x=rolling_sh.index, y=rolling_sh.values,
+                                             name='63-Day Rolling Sharpe',
+                                             line=dict(color=COLORS['success'], width=1.5)))
+                fig_rsh.add_hline(y=0, line_dash="dash", line_color=COLORS['gray'])
+                fig_rsh.update_layout(title="Rolling Sharpe Ratio (Quarterly)", height=250,
+                                      template='plotly_dark' if theme_dark else 'plotly_white',
+                                      yaxis_title="Sharpe Ratio")
+                st.plotly_chart(fig_rsh, use_container_width=True)
         
         # TAB 2: VAR ANALYSIS
         with tab2:
@@ -854,9 +972,235 @@ if mode == "Single Stock":
                 st.error(ml_results.get('error', 'ML prediction failed'))
                 st.info("Ensure XGBoost is installed: pip install xgboost")
         
-        # TAB 8: EXPORT
+        # TAB 8: OPTIONS ANALYTICS (NEW)
         with tab8:
-            st.subheader("Export Data")
+            st.subheader("Options Analytics")
+            
+            if HAS_FEATURES:
+                options = OptionsAnalytics()
+                current_price = float(prices.iloc[-1]) if len(prices) > 0 else 100
+                hist_vol = metrics['ann_vol']
+                
+                st.markdown("#### Black-Scholes Options Calculator")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    opt_type = st.selectbox("Option Type", ["Call", "Put"])
+                    strike = st.number_input("Strike Price ($)", 
+                                            value=float(round(current_price * 1.0)), 
+                                            min_value=1.0, step=1.0)
+                with col2:
+                    days_to_exp = st.slider("Days to Expiry", 1, 365, 30)
+                    T = days_to_exp / 365
+                with col3:
+                    vol_input = st.slider("Volatility (%)", 5, 100, int(hist_vol * 100)) / 100
+                    rf_option = st.number_input("Risk-Free Rate (%)", 0.0, 10.0, 4.5, 0.1) / 100
+                with col4:
+                    st.metric("Current Price", f"${current_price:.2f}")
+                    st.metric("Historical Vol", f"{hist_vol:.1%}")
+                
+                # Calculate option metrics
+                opt_analysis = options.analyze_option(
+                    S=current_price, K=strike, T=T, r=rf_option, 
+                    sigma=vol_input, option_type=opt_type.lower()
+                )
+                
+                st.markdown("---")
+                st.markdown("#### Option Pricing & Greeks")
+                
+                col1, col2, col3, col4, col5 = st.columns(5)
+                col1.metric("Option Price", f"${opt_analysis['price']:.2f}")
+                col2.metric("Premium (100 shares)", f"${opt_analysis['premium']:.2f}")
+                col3.metric("Breakeven", f"${opt_analysis['breakeven']:.2f}")
+                col4.metric("Moneyness", opt_analysis['moneyness'])
+                col5.metric("Intrinsic Value", f"${opt_analysis['intrinsic_value']:.2f}")
+                
+                st.markdown("---")
+                greeks = opt_analysis['greeks']
+                
+                col1, col2, col3, col4, col5 = st.columns(5)
+                col1.metric("Delta (Δ)", f"{greeks['delta']:.4f}", 
+                           help="Change in option price per $1 stock move")
+                col2.metric("Gamma (Γ)", f"{greeks['gamma']:.4f}",
+                           help="Rate of change of delta")
+                col3.metric("Theta (Θ)", f"${greeks['theta']:.4f}",
+                           help="Daily time decay in $")
+                col4.metric("Vega (ν)", f"${greeks['vega']:.4f}",
+                           help="Sensitivity to 1% vol change")
+                col5.metric("Rho (ρ)", f"${greeks['rho']:.4f}",
+                           help="Sensitivity to 1% rate change")
+                
+                # Payoff diagram
+                st.markdown("---")
+                st.markdown("#### Payoff Diagram at Expiration")
+                
+                prices_range, payoffs = options.calculate_payoff_diagram(
+                    S=current_price, K=strike, premium=opt_analysis['price'],
+                    option_type=opt_type.lower(), is_long=True, price_range=0.3
+                )
+                
+                fig_payoff = go.Figure()
+                fig_payoff.add_trace(go.Scatter(
+                    x=prices_range, y=payoffs, name='Profit/Loss',
+                    line=dict(color=COLORS['primary'], width=2),
+                    fill='tozeroy', 
+                    fillcolor='rgba(0, 122, 255, 0.1)'
+                ))
+                fig_payoff.add_vline(x=current_price, line_dash="dash", 
+                                     line_color=COLORS['warning'],
+                                     annotation_text=f"Current: ${current_price:.0f}")
+                fig_payoff.add_vline(x=strike, line_dash="dot", 
+                                     line_color=COLORS['gray'],
+                                     annotation_text=f"Strike: ${strike:.0f}")
+                fig_payoff.add_hline(y=0, line_color=COLORS['danger'], line_width=1)
+                fig_payoff.update_layout(
+                    title=f"{opt_type} Option Payoff at Expiration",
+                    xaxis_title="Stock Price at Expiration ($)",
+                    yaxis_title="Profit/Loss ($)",
+                    template='plotly_dark' if theme_dark else 'plotly_white',
+                    height=350
+                )
+                st.plotly_chart(fig_payoff, use_container_width=True)
+                
+                # Strategy Analysis
+                st.markdown("---")
+                st.markdown("#### Strategy Analysis")
+                
+                strategy = st.selectbox("Select Strategy", 
+                                       ["Covered Call", "Protective Put", "Straddle"])
+                
+                if strategy == "Covered Call":
+                    cc = options.covered_call_analysis(current_price, strike, T, rf_option, vol_input)
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Premium Received", f"${cc['premium_received']:.2f}")
+                    col2.metric("Max Profit", f"${cc['max_profit']:.2f}")
+                    col3.metric("Breakeven", f"${cc['breakeven']:.2f}")
+                    st.caption(f"Return if called: {cc['return_if_called']:.1%} annualized")
+                
+                elif strategy == "Protective Put":
+                    pp = options.protective_put_analysis(current_price, strike, T, rf_option, vol_input)
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Put Premium", f"${pp['premium_paid']:.2f}")
+                    col2.metric("Max Loss", f"${pp['max_loss']:.2f}")
+                    col3.metric("Protection Level", f"${pp['protection_level']:.2f}")
+                    st.caption(f"Cost of protection: {pp['cost_of_protection']:.2%}")
+                
+                elif strategy == "Straddle":
+                    strad = options.straddle_analysis(current_price, current_price, T, rf_option, vol_input)
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Total Cost", f"${strad['total_cost']:.2f}")
+                    col2.metric("Upper Breakeven", f"${strad['upper_breakeven']:.2f}")
+                    col3.metric("Lower Breakeven", f"${strad['lower_breakeven']:.2f}")
+                    st.caption(f"Required move to breakeven: {strad['required_move']:.1%}")
+            else:
+                st.info("Options analytics module not available. Check installation.")
+        
+        # TAB 9: FUNDAMENTALS (NEW)
+        with tab9:
+            st.subheader("Fundamental Analysis")
+            
+            if HAS_FEATURES and info:
+                fa = FundamentalAnalyzer()
+                
+                # Prepare info dict with proper field mappings
+                fund_info = {
+                    'ticker': ticker,
+                    'name': info.get('shortName', info.get('longName', ticker)),
+                    'sector': info.get('sector', 'Unknown'),
+                    'industry': info.get('industry', 'Unknown'),
+                    'pe_ratio': info.get('trailingPE'),
+                    'forward_pe': info.get('forwardPE'),
+                    'price_to_book': info.get('priceToBook'),
+                    'price_to_sales': info.get('priceToSalesTrailing12Months'),
+                    'peg_ratio': info.get('pegRatio'),
+                    'ev_to_ebitda': info.get('enterpriseToEbitda'),
+                    'roe': info.get('returnOnEquity'),
+                    'roa': info.get('returnOnAssets'),
+                    'profit_margin': info.get('profitMargins'),
+                    'operating_margin': info.get('operatingMargins'),
+                    'debt_to_equity': info.get('debtToEquity'),
+                    'current_ratio': info.get('currentRatio'),
+                    'quick_ratio': info.get('quickRatio'),
+                    'revenue_growth': info.get('revenueGrowth'),
+                    'earnings_growth': info.get('earningsGrowth'),
+                    'price': info.get('currentPrice', info.get('regularMarketPrice')),
+                    'eps': info.get('trailingEps'),
+                    'book_value': info.get('bookValue'),
+                    'free_cash_flow': info.get('freeCashflow'),
+                    'shares_outstanding': info.get('sharesOutstanding')
+                }
+                
+                analysis = fa.analyze_fundamentals(fund_info)
+                
+                # Quality Score
+                if analysis.get('quality_score'):
+                    qs = analysis['quality_score']
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Quality Grade", qs['grade'])
+                    col2.metric("Score", f"{qs['total_score']}/{qs['max_score']}")
+                    col3.metric("Sector", analysis.get('sector', 'N/A'))
+                    col4.metric("Industry", analysis.get('industry', 'N/A')[:20])
+                
+                st.markdown("---")
+                
+                # Valuation Section
+                st.markdown("#### Valuation Ratios")
+                val = analysis.get('valuation', {})
+                col1, col2, col3, col4, col5 = st.columns(5)
+                col1.metric("P/E Ratio", f"{val.get('pe_ratio', 'N/A'):.1f}" if val.get('pe_ratio') else "N/A")
+                col2.metric("Forward P/E", f"{val.get('forward_pe', 'N/A'):.1f}" if val.get('forward_pe') else "N/A")
+                col3.metric("P/B Ratio", f"{val.get('price_to_book', 'N/A'):.1f}" if val.get('price_to_book') else "N/A")
+                col4.metric("P/S Ratio", f"{val.get('price_to_sales', 'N/A'):.1f}" if val.get('price_to_sales') else "N/A")
+                col5.metric("EV/EBITDA", f"{val.get('ev_to_ebitda', 'N/A'):.1f}" if val.get('ev_to_ebitda') else "N/A")
+                
+                # Profitability
+                st.markdown("---")
+                st.markdown("#### Profitability")
+                prof = analysis.get('profitability', {})
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("ROE", f"{prof.get('roe', 0):.1%}" if prof.get('roe') else "N/A")
+                col2.metric("ROA", f"{prof.get('roa', 0):.1%}" if prof.get('roa') else "N/A")
+                col3.metric("Profit Margin", f"{prof.get('profit_margin', 0):.1%}" if prof.get('profit_margin') else "N/A")
+                col4.metric("Operating Margin", f"{prof.get('operating_margin', 0):.1%}" if prof.get('operating_margin') else "N/A")
+                
+                # Financial Health
+                st.markdown("---")
+                st.markdown("#### Financial Health")
+                health = analysis.get('financial_health', {})
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Debt/Equity", f"{health.get('debt_to_equity', 'N/A'):.0f}" if health.get('debt_to_equity') else "N/A")
+                col2.metric("Current Ratio", f"{health.get('current_ratio', 'N/A'):.2f}" if health.get('current_ratio') else "N/A")
+                col3.metric("Quick Ratio", f"{health.get('quick_ratio', 'N/A'):.2f}" if health.get('quick_ratio') else "N/A")
+                
+                # Growth
+                st.markdown("---")
+                st.markdown("#### Growth Metrics")
+                growth = analysis.get('growth', {})
+                col1, col2 = st.columns(2)
+                col1.metric("Revenue Growth", f"{growth.get('revenue_growth', 0):.1%}" if growth.get('revenue_growth') else "N/A")
+                col2.metric("Earnings Growth", f"{growth.get('earnings_growth', 0):.1%}" if growth.get('earnings_growth') else "N/A")
+                
+                # Intrinsic Value Estimate
+                st.markdown("---")
+                st.markdown("#### Intrinsic Value Estimate")
+                iv = fa.calculate_intrinsic_value(fund_info)
+                if iv and 'methods' in iv:
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Avg Intrinsic Value", f"${iv['average_intrinsic_value']:.2f}" if iv['average_intrinsic_value'] else "N/A")
+                    col2.metric("Current Price", f"${iv['current_price']:.2f}" if iv['current_price'] else "N/A")
+                    if iv.get('upside_potential'):
+                        col3.metric("Upside Potential", f"{iv['upside_potential']:.1%}",
+                                   delta=f"{'Undervalued' if iv['upside_potential'] > 0 else 'Overvalued'}")
+                    
+                    st.caption("Valuation methods: " + ", ".join(iv['methods'].keys()))
+                else:
+                    st.info("Insufficient data for intrinsic value calculation")
+            else:
+                st.info("Fundamental analysis requires company info data")
+        
+        # TAB 10: EXPORT
+        with tab10:
+            st.subheader("Export Data & Reports")
             
             metrics_export = {
                 'Ticker': ticker,
@@ -875,19 +1219,89 @@ if mode == "Single Stock":
             metrics_df = pd.DataFrame([metrics_export])
             csv_metrics = metrics_df.to_csv(index=False)
             
+            st.markdown("#### CSV Downloads")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.download_button("Download Metrics", csv_metrics, f"{ticker}_risk_metrics.csv", "text/csv")
+                st.download_button("📊 Download Metrics", csv_metrics, f"{ticker}_risk_metrics.csv", "text/csv")
             
             with col2:
                 returns_export_df = pd.DataFrame({'Date': rets.index, 'Return': rets.values})
                 csv_returns = returns_export_df.to_csv(index=False)
-                st.download_button("Download Returns", csv_returns, f"{ticker}_returns.csv", "text/csv")
+                st.download_button("📈 Download Returns", csv_returns, f"{ticker}_returns.csv", "text/csv")
             
             with col3:
                 prices_export_df = pd.DataFrame({'Date': prices.index, 'Price': prices.values})
                 csv_prices = prices_export_df.to_csv(index=False)
-                st.download_button("Download Prices", csv_prices, f"{ticker}_prices.csv", "text/csv")
+                st.download_button("💹 Download Prices", csv_prices, f"{ticker}_prices.csv", "text/csv")
+            
+            # PDF Report Generation
+            st.markdown("---")
+            st.markdown("#### PDF Risk Report")
+            
+            if HAS_FEATURES:
+                report_gen = ReportGenerator()
+                if report_gen.is_available():
+                    if st.button("📄 Generate PDF Report", type="primary"):
+                        with st.spinner("Generating professional PDF report..."):
+                            var_data = {
+                                'var_95': abs(p_var),
+                                'var_99': abs(parametric_var(rets, var_horizon, 0.99)),
+                                'hist_var_95': abs(h_var),
+                                'hist_var_99': abs(historical_var(rets, var_horizon, 0.99)),
+                                'cvar': abs(cv),
+                                'cvar_99': abs(cvar(rets, 0.99))
+                            }
+                            
+                            pdf_bytes = report_gen.generate_single_stock_report(
+                                ticker=ticker,
+                                metrics=metrics,
+                                var_data=var_data,
+                                info=info
+                            )
+                            
+                            if pdf_bytes:
+                                st.download_button(
+                                    "⬇️ Download PDF Report",
+                                    data=pdf_bytes,
+                                    file_name=f"{ticker}_risk_report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                                    mime="application/pdf"
+                                )
+                                st.success("PDF report generated successfully!")
+                            else:
+                                st.error("Failed to generate PDF report")
+                else:
+                    st.info("PDF generation requires fpdf2: `pip install fpdf2`")
+            else:
+                st.info("Report generation module not available")
+            
+            # Alerts Management
+            st.markdown("---")
+            st.markdown("#### Risk Alerts")
+            
+            if HAS_FEATURES:
+                alert_manager = AlertManager()
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Create New Alert**")
+                    alert_metric = st.selectbox("Metric", ['var', 'volatility', 'max_drawdown', 'sharpe'], key="alert_metric")
+                    alert_threshold = st.number_input("Threshold", value=0.05, step=0.01, key="alert_thresh")
+                    alert_direction = st.selectbox("Trigger when", ['above', 'below'], key="alert_dir")
+                    
+                    if st.button("➕ Add Alert"):
+                        alert_manager.add_alert(ticker, alert_metric, alert_threshold, alert_direction)
+                        st.success(f"Alert created for {ticker}")
+                
+                with col2:
+                    st.markdown("**Active Alerts**")
+                    alerts = alert_manager.get_alerts(ticker)
+                    if alerts:
+                        for alert in alerts:
+                            st.text(f"- {alert['name']}")
+                    else:
+                        st.caption("No active alerts for this ticker")
+            else:
+                st.info("Alerts module not available")
 
 # ============================================================================
 # PORTFOLIO MODE
@@ -895,10 +1309,37 @@ if mode == "Single Stock":
 else:
     st.markdown("### Portfolio Analysis")
     
+    # Portfolio Save/Load Section (NEW)
+    if HAS_FEATURES:
+        portfolio_store = PortfolioStore()
+        
+        with st.expander("📁 Saved Portfolios", expanded=False):
+            saved_portfolios = portfolio_store.list_portfolios()
+            
+            if saved_portfolios:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    selected_portfolio = st.selectbox(
+                        "Load Portfolio", 
+                        [p['name'] for p in saved_portfolios],
+                        key="load_portfolio_select"
+                    )
+                with col2:
+                    if st.button("📥 Load"):
+                        loaded = portfolio_store.load_portfolio(selected_portfolio)
+                        if loaded:
+                            st.session_state['loaded_tickers'] = ",".join(loaded['tickers'])
+                            st.session_state['loaded_weights'] = loaded['weights']
+                            st.success(f"Loaded: {selected_portfolio}")
+                            st.rerun()
+            else:
+                st.caption("No saved portfolios yet")
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        tickers_input = st.text_input("Enter Tickers (comma-separated)", "AAPL, MSFT, GOOGL, AMZN, NVDA")
+        default_tickers = st.session_state.get('loaded_tickers', "AAPL, MSFT, GOOGL, AMZN, NVDA")
+        tickers_input = st.text_input("Enter Tickers (comma-separated)", default_tickers)
         tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
     
     with col2:
@@ -907,16 +1348,28 @@ else:
     if tickers:
         st.markdown("#### Portfolio Weights")
         weights = {}
+        loaded_weights = st.session_state.get('loaded_weights', {})
         cols = st.columns(len(tickers))
         for i, ticker in enumerate(tickers):
             with cols[i]:
-                weights[ticker] = st.number_input(f"{ticker} %", 0, 100, int(100/len(tickers)), key=f"w_{ticker}")
+                default_weight = int(loaded_weights.get(ticker, 100/len(tickers)))
+                weights[ticker] = st.number_input(f"{ticker} %", 0, 100, default_weight, key=f"w_{ticker}")
         
         total_weight = sum(weights.values())
         if total_weight != 100:
             st.warning(f"Weights sum to {total_weight}%. Should be 100%.")
         
         weights_array = np.array(list(weights.values())) / 100
+        
+        # Save Portfolio Button
+        if HAS_FEATURES:
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                portfolio_name = st.text_input("Portfolio Name", "My Portfolio", key="save_port_name")
+            with col2:
+                if st.button("💾 Save Portfolio"):
+                    portfolio_store.save_portfolio(portfolio_name, tickers, weights)
+                    st.success(f"Saved: {portfolio_name}")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -1200,7 +1653,8 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #8E8E93; font-size: 0.8rem;'>
-    Stock Risk Model v3.0 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk<br>
+    Stock Risk Model v4.0 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk<br>
+    Options Analytics | Fundamentals | PDF Reports | Alerts | Alpha Vantage Integration<br>
     Built with Streamlit, XGBoost, GARCH, Fama-French | Local Analysis Only
 </div>
 """, unsafe_allow_html=True)
