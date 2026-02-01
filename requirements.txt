@@ -1,4 +1,4 @@
-# Stock Risk Modelling App - Enterprise Edition v4.0
+# Stock Risk Modelling App - Enterprise Edition v4.1
 # ==================================================
 # pip install -r requirements.txt
 
@@ -33,3 +33,18 @@ fpdf2>=2.7.0
 
 # Environment Configuration
 python-dotenv>=1.0.0
+
+# =============================================
+# NEW in v4.1 - Enhanced Features
+# =============================================
+
+# Timezone handling for market hours
+pytz>=2023.3
+
+# Enhanced clustering for HRP and regime detection
+# (scipy already provides most clustering needs)
+
+# Optional: Deep learning for LSTM volatility forecasting
+# Uncomment if you want LSTM capabilities:
+# tensorflow>=2.15.0
+# keras>=3.0.0

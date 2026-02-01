@@ -5,6 +5,36 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Version](https://img.shields.io/badge/version-4.1-brightgreen.svg)
+
+## ✨ What's New in v4.1
+
+### Enhanced Analytics
+- **VaR Backtesting** - Kupiec and Christoffersen tests for model validation
+- **Regime Detection** - GMM-based Bull/Bear/Sideways market identification
+- **Ensemble VaR** - Combine XGBoost, GARCH, Historical, Parametric, and EWMA models
+- **Confidence Intervals** - Bootstrap-based uncertainty quantification
+
+### Advanced Portfolio Features
+- **Risk Parity Optimization** - Equal risk contribution allocation
+- **Hierarchical Risk Parity (HRP)** - Clustering-based portfolio construction
+- **Black-Litterman Model** - Combine market equilibrium with investor views
+- **Transaction Cost Analysis** - Estimate rebalancing costs
+- **Threshold Rebalancing** - Drift-based rebalancing recommendations
+- **Tax-Loss Harvesting** - Identify tax optimization opportunities
+
+### Real-time Features
+- **Live Market Quotes** - Real-time price updates
+- **Market Hours Detection** - NYSE, NASDAQ, LSE schedule awareness
+- **Live P&L Tracking** - Real-time profit/loss calculations
+
+### Enhanced Visualizations
+- **Interactive Correlation Heatmaps** - Clustered correlation matrices
+- **VaR Cone Projections** - Monte Carlo confidence cones
+- **3D Volatility Surfaces** - Options IV surface visualization
+- **Downloadable Charts** - Export charts as HTML
+
+---
 
 ## Features
 
@@ -101,6 +131,47 @@ Factor analysis & advanced metrics:
 - Kelly Criterion position sizing
 - ESG rating integration
 - Performance attribution
+
+### `utils/` (NEW in v4.1)
+Enhanced utilities package:
+
+#### `utils/performance.py`
+- Cached data fetching with TTL
+- Lazy loading decorators
+- Progress tracking utilities
+
+#### `utils/validation.py`
+- Robust ticker validation
+- Retry logic with exponential backoff
+- Data quality checks (outliers, missing data)
+- Corporate action adjustments
+
+#### `utils/analytics.py`
+- VaR backtesting (Kupiec, Christoffersen tests)
+- Regime detection with Gaussian Mixture Models
+- Time-varying beta (rolling, EWMA, Kalman)
+- CoVaR systemic risk measures
+- Enhanced stress testing
+
+#### `utils/portfolio.py`
+- Risk parity optimization
+- Hierarchical Risk Parity (HRP)
+- Black-Litterman model
+- Transaction cost modeling
+- Threshold rebalancing
+- Tax-loss harvesting
+
+#### `utils/visualization.py`
+- Interactive correlation heatmaps
+- 3D volatility surfaces
+- VaR cone projections
+- Risk contribution charts
+- Chart export utilities
+
+#### `utils/realtime.py`
+- Live quote fetching
+- Market hours detection
+- Real-time P&L tracking
 
 ## Use Cases
 

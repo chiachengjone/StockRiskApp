@@ -1,9 +1,10 @@
 """
-STOCK RISK MODELLING APP v4.0
+STOCK RISK MODELLING APP v4.1
 ==============================
 Streamlit + yfinance + GARCH + EVT + Monte Carlo + Portfolio Mode + Stress Testing
 + Fama-French Factors + Kelly Criterion + ESG + XGBoost AI VaR
 + Options Analytics + Fundamentals + Comparison + Alerts + PDF Reports
++ Enhanced Analytics + Risk Parity + Black-Litterman + Real-time Features
 """
 
 import streamlit as st
@@ -44,6 +45,38 @@ try:
 except ImportError:
     CONFIG_COLORS = None
     CONFIG_STOCKS = None
+
+# Import enhanced utilities (v4.1)
+try:
+    from utils import (
+        # Performance
+        ProgressTracker, performance_monitor,
+        # Validation
+        validate_ticker_robust, validate_returns_data, DataValidator,
+        fetch_with_retry, handle_missing_data, detect_outliers,
+        # Analytics
+        backtest_var_kupiec, backtest_var_christoffersen,
+        regime_detection, time_varying_beta, covar_systemic_risk,
+        rolling_correlation_breakdown, enhanced_stress_test, AnalyticsEngine,
+        # Portfolio
+        risk_parity_weights, hierarchical_risk_parity,
+        black_litterman_optimization, PortfolioOptimizer,
+        threshold_rebalancing, calculate_rebalance_costs,
+        tax_loss_harvesting_opportunities, portfolio_risk_decomposition,
+        # Visualization
+        interactive_correlation_heatmap, rolling_correlation_chart,
+        volatility_surface_3d, var_cone_chart, var_comparison_chart,
+        risk_contribution_chart, cumulative_returns_chart,
+        performance_attribution_chart, rolling_performance_chart,
+        factor_exposure_chart, regime_chart, VisualizationEngine,
+        make_chart_downloadable, apply_dark_theme,
+        # Realtime
+        get_live_quote, is_market_open, calculate_live_pnl, RealtimeEngine
+    )
+    HAS_ENHANCED_UTILS = True
+except ImportError as e:
+    HAS_ENHANCED_UTILS = False
+    print(f"Enhanced utils not available: {e}")
 
 # ============================================================================
 # PAGE CONFIG & STYLING
@@ -259,8 +292,25 @@ with st.sidebar:
         if alert_summary['triggered_today'] > 0:
             st.warning(f"⚠️ {alert_summary['triggered_today']} alerts triggered today")
     
+    # Market Status (v4.1)
+    if HAS_ENHANCED_UTILS:
+        st.divider()
+        market_status = is_market_open()
+        if market_status.get('is_open', False):
+            st.success("🟢 Market Open")
+        else:
+            st.info("🔴 Market Closed")
+    
+    # ML Model Status
     st.divider()
-    st.caption("v4.0")
+    ml_test = MLPredictor()
+    if ml_test.model_type == 'xgboost':
+        st.success("🚀 XGBoost Ready")
+    else:
+        st.warning("⚡ Using GradientBoosting\n(XGBoost unavailable)")
+    
+    st.divider()
+    st.caption("v4.1" + (" | Enhanced" if HAS_ENHANCED_UTILS else ""))
 
 # ============================================================================
 # ASSET DEFINITIONS
@@ -557,10 +607,18 @@ if mode == "Single Stock":
         h_var = historical_var(rets, var_horizon, conf_level)
         cv = cvar(rets, conf_level)
         
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
-            "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
-            "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Export"
-        ])
+        # Define tabs - include Enhanced if utils available
+        if HAS_ENHANCED_UTILS:
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
+                "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
+                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Enhanced ✨", "Export"
+            ])
+        else:
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+                "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
+                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Export"
+            ])
+            tab11 = None
         
         # TAB 1: OVERVIEW
         with tab1:
@@ -912,10 +970,18 @@ if mode == "Single Stock":
             
             ml = MLPredictor()
             
-            with st.spinner("Training XGBoost model..."):
+            # Show model type indicator
+            model_status = "🚀 XGBoost" if ml.model_type == 'xgboost' else "⚡ GradientBoosting"
+            st.info(f"Using: **{model_status}** (ML Model)")
+            
+            with st.spinner(f"Training {ml.model_type} model..."):
                 ml_results = ml.train_predict(rets, prices)
             
             if 'error' not in ml_results:
+                # Display model type used
+                model_name = ml_results.get('model_type', 'ML').replace('_', ' ').title()
+                st.success(f"✅ Model trained successfully using **{model_name}**")
+                
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("AI Predicted VaR", f"{ml_results['predicted_var']:.2%}")
                 col2.metric("Model R-Squared", f"{ml_results['r2_score']:.3f}")
@@ -925,8 +991,9 @@ if mode == "Single Stock":
                 st.markdown("---")
                 
                 st.markdown("### VaR Method Comparison")
+                model_display_name = ml_results.get('model_type', 'ML').replace('_', ' ').title()
                 comparison_df = pd.DataFrame({
-                    'Method': ['XGBoost ML', 'GARCH', 'Historical', 'Parametric'],
+                    'Method': [f'{model_display_name} ML', 'GARCH', 'Historical', 'Parametric'],
                     '95% VaR': [
                         ml_results['predicted_var'],
                         ml_results['comparison'].get('garch_approx', 0),
@@ -1198,8 +1265,220 @@ if mode == "Single Stock":
             else:
                 st.info("Fundamental analysis requires company info data")
         
-        # TAB 10: EXPORT
-        with tab10:
+        # TAB 10: ENHANCED ANALYTICS (v4.1)
+        if HAS_ENHANCED_UTILS and tab11 is not None:
+            with tab10:
+                st.subheader("Enhanced Analytics ✨")
+                st.caption("Advanced risk analysis powered by v4.1 enhancements")
+                
+                enhanced_subtab = st.radio(
+                    "Select Analysis",
+                    ["📊 VaR Backtesting", "🔄 Regime Detection", "📈 Ensemble Predictions", 
+                     "⏱️ Real-time Data", "📉 Advanced Visualizations"],
+                    horizontal=True
+                )
+                
+                st.markdown("---")
+                
+                if enhanced_subtab == "📊 VaR Backtesting":
+                    st.markdown("### VaR Model Backtesting")
+                    st.info("Test how well VaR models predicted actual losses using Kupiec and Christoffersen tests.")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        bt_confidence = st.selectbox("Confidence Level", [0.95, 0.99], index=0)
+                    with col2:
+                        bt_window = st.slider("Lookback Window", 60, 252, 126)
+                    
+                    if st.button("Run Backtest", type="primary"):
+                        with st.spinner("Running VaR backtest..."):
+                            # Calculate VaR series
+                            var_series = rets.rolling(bt_window).apply(
+                                lambda x: np.percentile(x, (1 - bt_confidence) * 100)
+                            )
+                            
+                            # Kupiec test
+                            kupiec = backtest_var_kupiec(rets, var_series, bt_confidence)
+                            
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("Violations", kupiec['violations'])
+                            col2.metric("Expected Rate", f"{kupiec['expected_rate']*100:.1f}%")
+                            col3.metric("P-Value", f"{kupiec['p_value']:.4f}")
+                            
+                            # Check if model passed (p-value >= 0.05 means we fail to reject H0)
+                            if kupiec['p_value'] >= 0.05:
+                                st.success(f"✅ VaR model PASSED Kupiec test at {bt_confidence:.0%} confidence")
+                            else:
+                                st.error(f"❌ VaR model FAILED Kupiec test - model may be miscalibrated")
+                            
+                            # Show violations chart
+                            fig = go.Figure()
+                            fig.add_trace(go.Scatter(
+                                x=rets.index, y=rets.values * 100,
+                                mode='lines', name='Returns', line=dict(color='#2196F3', width=1)
+                            ))
+                            fig.add_trace(go.Scatter(
+                                x=var_series.index, y=var_series.values * 100,
+                                mode='lines', name=f'VaR {bt_confidence:.0%}', 
+                                line=dict(color='#FF5722', width=2, dash='dash')
+                            ))
+                            fig.update_layout(
+                                title="Returns vs VaR Threshold",
+                                xaxis_title="Date", yaxis_title="Return (%)",
+                                template='plotly_dark' if theme_dark else 'plotly_white',
+                                height=400
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                
+                elif enhanced_subtab == "🔄 Regime Detection":
+                    st.markdown("### Market Regime Detection")
+                    st.info("Identify Bull, Bear, and Sideways market regimes using Gaussian Mixture Models.")
+                    
+                    n_regimes = st.slider("Number of Regimes", 2, 4, 3)
+                    
+                    if st.button("Detect Regimes", type="primary"):
+                        with st.spinner("Detecting market regimes..."):
+                            regime_result = regime_detection(rets, n_regimes=n_regimes)
+                            
+                            if 'error' not in regime_result:
+                                st.success(f"Detected {regime_result['n_regimes']} regimes")
+                                
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.metric("Current Regime", regime_result['current_regime'])
+                                with col2:
+                                    current_label = regime_result['current_regime']
+                                    if 'Bull' in str(current_label):
+                                        st.success("🟢 Bullish Environment")
+                                    elif 'Bear' in str(current_label):
+                                        st.error("🔴 Bearish Environment")
+                                    else:
+                                        st.info("🟡 Neutral/Sideways")
+                                
+                                # Regime statistics
+                                st.markdown("#### Regime Statistics")
+                                stats_df = pd.DataFrame(regime_result['regime_characteristics']).T
+                                st.dataframe(stats_df, use_container_width=True)
+                                
+                                # Regime chart
+                                regime_series = regime_result['regime_series']
+                                fig = regime_chart(prices, regime_series, title=f"{ticker} Price with Regime Overlay")
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.error(regime_result['error'])
+                
+                elif enhanced_subtab == "📈 Ensemble Predictions":
+                    st.markdown("### Ensemble VaR Predictions")
+                    
+                    # Show which ML model is available
+                    ml_check = MLPredictor()
+                    ml_model_name = "XGBoost" if ml_check.model_type == 'xgboost' else "GradientBoosting"
+                    st.info(f"Combine multiple models ({ml_model_name}, GARCH, Historical, Parametric, EWMA) for robust VaR estimates.")
+                    
+                    if st.button("Generate Ensemble Prediction", type="primary"):
+                        with st.spinner("Running ensemble models..."):
+                            ml = MLPredictor()
+                            ensemble = ml.ensemble_predict(rets, prices)
+                            
+                            if 'error' not in ensemble:
+                                # Show which model was used
+                                st.success(f"✅ Ensemble complete using {ml.model_type.replace('_', ' ').title()}")
+                                
+                                col1, col2, col3 = st.columns(3)
+                                col1.metric("Ensemble VaR", f"{ensemble['ensemble_var']:.2%}")
+                                col2.metric("Model Spread", f"{ensemble['spread']:.2%}")
+                                col3.metric("Models Used", ensemble['n_models'])
+                                
+                                # Individual predictions chart
+                                fig = var_comparison_chart(
+                                    ensemble['individual_predictions'],
+                                    title="VaR by Model"
+                                )
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                                # Confidence intervals
+                                st.markdown("#### Bootstrap Confidence Intervals")
+                                with st.spinner("Calculating confidence intervals..."):
+                                    ci_result = ml.predict_with_confidence(rets, prices, n_bootstrap=50)
+                                    
+                                    if 'error' not in ci_result:
+                                        col1, col2, col3 = st.columns(3)
+                                        col1.metric("Mean VaR", f"{ci_result['mean_var']:.2%}")
+                                        col2.metric("95% CI Lower", f"{ci_result['ci_5']:.2%}")
+                                        col3.metric("95% CI Upper", f"{ci_result['ci_95']:.2%}")
+                            else:
+                                st.error(ensemble.get('error', 'Ensemble prediction failed'))
+                
+                elif enhanced_subtab == "⏱️ Real-time Data":
+                    st.markdown("### Real-time Market Data")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        market_status = is_market_open()
+                        if market_status.get('is_open', False):
+                            st.success("🟢 Market is OPEN")
+                        else:
+                            st.warning("🔴 Market is CLOSED")
+                    
+                    with col2:
+                        if st.button("Refresh Quote"):
+                            st.rerun()
+                    
+                    # Live quote
+                    live = get_live_quote(ticker)
+                    if live and live.get('price'):
+                        st.markdown(f"### {ticker} Live Quote")
+                        col1, col2, col3, col4 = st.columns(4)
+                        col1.metric("Price", f"${live['price']:.2f}")
+                        change_val = live.get('change', 0) or 0
+                        change_pct = live.get('change_pct', 0) or 0
+                        col2.metric("Change", f"${change_val:.2f}", delta=f"{change_pct:.2f}%")
+                        col3.metric("Volume", f"{live['volume']:,.0f}" if live.get('volume') else "N/A")
+                        col4.metric("Day Range", f"${live['low']:.2f} - ${live['high']:.2f}" if live.get('low') and live.get('high') else "N/A")
+                        
+                        st.caption(f"Last updated: {live.get('last_updated', 'Unknown')}")
+                    else:
+                        st.info("Live quote not available")
+                
+                elif enhanced_subtab == "📉 Advanced Visualizations":
+                    st.markdown("### Advanced Visualizations")
+                    
+                    viz_type = st.selectbox(
+                        "Select Visualization",
+                        ["VaR Cone Projection", "Rolling Performance", "Cumulative Returns"]
+                    )
+                    
+                    if viz_type == "VaR Cone Projection":
+                        horizon = st.slider("Projection Horizon (days)", 10, 90, 30)
+                        fig = var_cone_chart(rets, horizon=horizon, title=f"{ticker} VaR Cone Projection")
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                    elif viz_type == "Rolling Performance":
+                        metric = st.selectbox("Metric", ["sharpe", "volatility", "return", "sortino"])
+                        fig = rolling_performance_chart(rets, metric=metric, title=f"{ticker} Rolling {metric.title()}")
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                    elif viz_type == "Cumulative Returns":
+                        # Compare with benchmark
+                        combined = pd.DataFrame({ticker: rets, benchmark: bench_rets})
+                        fig = cumulative_returns_chart(combined, title="Cumulative Returns Comparison")
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Download chart
+                    st.markdown("---")
+                    if st.button("📥 Download Chart as HTML"):
+                        html = make_chart_downloadable(fig)
+                        st.download_button(
+                            "Download", html, 
+                            f"{ticker}_chart.html", "text/html"
+                        )
+            
+            # TAB 11: EXPORT (was tab10)
+            export_tab = tab11
+        else:
+            export_tab = tab10
+        
+        with export_tab:
             st.subheader("Export Data & Reports")
             
             metrics_export = {
@@ -1440,9 +1719,17 @@ else:
         prices_df = st.session_state.port_prices_df
         weights = st.session_state.port_weights
         
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-            "Summary", "Monte Carlo", "Correlation", "Stress Test", "Optimization", "Charts", "Export"
-        ])
+        # Define tabs - include Enhanced if utils available
+        if HAS_ENHANCED_UTILS:
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+                "Summary", "Monte Carlo", "Correlation", "Stress Test", 
+                "Optimization", "Enhanced ✨", "Charts", "Export"
+            ])
+        else:
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+                "Summary", "Monte Carlo", "Correlation", "Stress Test", "Optimization", "Charts", "Export"
+            ])
+            tab8 = None
         
         with tab1:
             st.subheader("Portfolio Risk Summary")
@@ -1598,7 +1885,218 @@ else:
                                     xaxis_title='Volatility', yaxis_title='Expected Return')
                 st.plotly_chart(fig_ef, use_container_width=True)
         
-        with tab6:
+        # TAB 6: ENHANCED PORTFOLIO ANALYTICS (v4.1)
+        if HAS_ENHANCED_UTILS and tab8 is not None:
+            with tab6:
+                st.subheader("Enhanced Portfolio Analytics ✨")
+                st.caption("Advanced portfolio optimization powered by v4.1 enhancements")
+                
+                port_enhanced_subtab = st.radio(
+                    "Select Analysis",
+                    ["⚖️ Risk Parity", "📊 Black-Litterman", "💰 Transaction Costs", 
+                     "🔄 Rebalancing", "📈 Risk Decomposition"],
+                    horizontal=True,
+                    key="port_enhanced_subtab"
+                )
+                
+                st.markdown("---")
+                
+                if port_enhanced_subtab == "⚖️ Risk Parity":
+                    st.markdown("### Risk Parity Optimization")
+                    st.info("Allocate capital so each asset contributes equally to portfolio risk.")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        target_vol = st.slider("Target Volatility", 0.05, 0.30, 0.15, 0.01)
+                    with col2:
+                        max_weight = st.slider("Max Weight per Asset", 0.20, 0.60, 0.40, 0.05)
+                    
+                    if st.button("Calculate Risk Parity", type="primary"):
+                        with st.spinner("Optimizing..."):
+                            rp_result = risk_parity_weights(
+                                returns_df, 
+                                target_risk=target_vol,
+                                max_weight=max_weight
+                            )
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Portfolio Volatility", f"{rp_result['portfolio_volatility']:.1%}")
+                                st.metric("Diversification Ratio", f"{rp_result['diversification_ratio']:.2f}")
+                            with col2:
+                                st.metric("Leverage for Target", f"{rp_result['leverage_for_target']:.2f}x")
+                            
+                            # Weights comparison
+                            st.markdown("#### Risk Parity Weights")
+                            rp_df = pd.DataFrame({
+                                'Asset': list(rp_result['weights'].keys()),
+                                'Current Weight': [weights.get(t, 0) for t in rp_result['weights'].keys()],
+                                'Risk Parity Weight': [v * 100 for v in rp_result['weights'].values()],
+                                'Risk Contribution': [v * 100 for v in rp_result['risk_contributions'].values()]
+                            })
+                            st.dataframe(rp_df.style.format({
+                                'Current Weight': '{:.1f}%',
+                                'Risk Parity Weight': '{:.1f}%',
+                                'Risk Contribution': '{:.1f}%'
+                            }), use_container_width=True, hide_index=True)
+                            
+                            # Risk contribution chart
+                            fig = risk_contribution_chart(
+                                rp_result['risk_contributions'],
+                                title="Risk Contribution by Asset"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                
+                elif port_enhanced_subtab == "📊 Black-Litterman":
+                    st.markdown("### Black-Litterman Model")
+                    st.info("Combine market equilibrium with your investment views.")
+                    
+                    st.markdown("#### Define Your Views")
+                    st.caption("Express views on expected returns (e.g., 'AAPL will outperform by 5%')")
+                    
+                    # Simple view input
+                    view_asset = st.selectbox("Asset with View", tickers)
+                    view_return = st.slider("Expected Annual Return", -0.20, 0.50, 0.10, 0.01)
+                    
+                    views = [{'asset': view_asset, 'return': view_return}]
+                    
+                    # Placeholder market caps (equal weight assumed)
+                    market_caps = {t: 1e9 for t in tickers}
+                    
+                    if st.button("Run Black-Litterman", type="primary"):
+                        with st.spinner("Optimizing with views..."):
+                            bl_result = black_litterman_optimization(
+                                returns_df, market_caps, views
+                            )
+                            
+                            if 'error' not in bl_result:
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.metric("Expected Return", f"{bl_result['portfolio_return']:.1%}")
+                                with col2:
+                                    st.metric("Portfolio Volatility", f"{bl_result['portfolio_volatility']:.1%}")
+                                
+                                # Show adjusted returns
+                                st.markdown("#### Posterior Expected Returns")
+                                ret_df = pd.DataFrame({
+                                    'Asset': list(bl_result['expected_returns'].keys()),
+                                    'Equilibrium': [v*100 for v in bl_result['equilibrium_returns'].values()],
+                                    'Posterior': [v*100 for v in bl_result['expected_returns'].values()],
+                                    'Weight': [v*100 for v in bl_result['weights'].values()]
+                                })
+                                st.dataframe(ret_df.style.format({
+                                    'Equilibrium': '{:.1f}%',
+                                    'Posterior': '{:.1f}%',
+                                    'Weight': '{:.1f}%'
+                                }), use_container_width=True, hide_index=True)
+                            else:
+                                st.error("Black-Litterman optimization failed")
+                
+                elif port_enhanced_subtab == "💰 Transaction Costs":
+                    st.markdown("### Transaction Cost Analysis")
+                    st.info("Estimate costs of rebalancing to target weights.")
+                    
+                    portfolio_value = st.number_input("Portfolio Value ($)", 10000, 10000000, 100000, 10000)
+                    
+                    # Get target weights (use optimal from earlier or risk parity)
+                    if st.button("Analyze Rebalance Costs", type="primary"):
+                        with st.spinner("Calculating costs..."):
+                            # Use current weights vs equal weight as example
+                            current_w = {t: weights[t]/100 for t in tickers}
+                            target_w = {t: 1/len(tickers) for t in tickers}
+                            
+                            # Placeholder prices
+                            prices_dict = {t: 100 for t in tickers}
+                            
+                            cost_result = calculate_rebalance_costs(
+                                current_w, target_w, portfolio_value, prices_dict
+                            )
+                            
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("Total Cost", f"${cost_result['total_cost']:.2f}")
+                            col2.metric("Cost (bps)", f"{cost_result['total_cost_bps']:.1f}")
+                            col3.metric("Turnover", f"{cost_result['turnover_pct']:.1f}%")
+                            
+                            # Trade list
+                            if cost_result['trades']:
+                                st.markdown("#### Proposed Trades")
+                                trades_df = pd.DataFrame(cost_result['trades'])
+                                st.dataframe(trades_df, use_container_width=True, hide_index=True)
+                
+                elif port_enhanced_subtab == "🔄 Rebalancing":
+                    st.markdown("### Rebalancing Analysis")
+                    st.info("Check if portfolio drift exceeds rebalancing thresholds.")
+                    
+                    threshold = st.slider("Rebalancing Threshold", 0.01, 0.20, 0.05, 0.01)
+                    
+                    # Simulate some drift
+                    current_w = {t: weights[t]/100 for t in tickers}
+                    target_w = {t: weights[t]/100 for t in tickers}  # Same for demo
+                    
+                    # Add some random drift for demo
+                    import random
+                    drifted_w = {t: w * (1 + random.uniform(-0.1, 0.1)) for t, w in current_w.items()}
+                    total_d = sum(drifted_w.values())
+                    drifted_w = {t: v/total_d for t, v in drifted_w.items()}
+                    
+                    rebal_result = threshold_rebalancing(drifted_w, target_w, threshold)
+                    
+                    if rebal_result['needs_rebalance']:
+                        st.warning(f"⚠️ Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
+                    else:
+                        st.success(f"✅ No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
+                    
+                    # Show drifts
+                    drift_df = pd.DataFrame({
+                        'Asset': list(rebal_result['drifts'].keys()),
+                        'Drift': [v*100 for v in rebal_result['drifts'].values()],
+                        'Threshold': [threshold*100]*len(rebal_result['drifts'])
+                    })
+                    st.dataframe(drift_df.style.format({'Drift': '{:.2f}%', 'Threshold': '{:.1f}%'}),
+                               use_container_width=True, hide_index=True)
+                
+                elif port_enhanced_subtab == "📈 Risk Decomposition":
+                    st.markdown("### Portfolio Risk Decomposition")
+                    st.info("Understand how each asset contributes to total portfolio risk.")
+                    
+                    weights_dict = {t: weights[t]/100 for t in tickers}
+                    decomp = portfolio_risk_decomposition(weights_dict, returns_df)
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Portfolio Volatility", f"{decomp['portfolio_volatility']:.1%}")
+                    with col2:
+                        st.metric("Concentration (HHI)", f"{decomp['concentration']:.0f}")
+                    
+                    # Risk contribution chart
+                    fig = risk_contribution_chart(
+                        decomp['pct_contributions'],
+                        title="Risk Contribution (%)"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Detailed breakdown
+                    st.markdown("#### Detailed Breakdown")
+                    decomp_df = pd.DataFrame({
+                        'Asset': list(decomp['risk_contributions'].keys()),
+                        'Risk Contribution': list(decomp['risk_contributions'].values()),
+                        '% of Total': list(decomp['pct_contributions'].values()),
+                        'Marginal Contribution': list(decomp['marginal_contributions'].values())
+                    })
+                    st.dataframe(decomp_df.style.format({
+                        'Risk Contribution': '{:.4f}',
+                        '% of Total': '{:.1f}%',
+                        'Marginal Contribution': '{:.4f}'
+                    }), use_container_width=True, hide_index=True)
+            
+            # Charts tab shifts to tab7
+            charts_tab = tab7
+            export_tab = tab8
+        else:
+            charts_tab = tab6
+            export_tab = tab7
+        
+        with charts_tab:
             cum_rets = (1 + port_rets).cumprod()
             bench_cum = (1 + bench_rets.reindex(port_rets.index).fillna(0)).cumprod()
             
@@ -1623,7 +2121,7 @@ else:
             fig_vol.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=300)
             st.plotly_chart(fig_vol, use_container_width=True)
         
-        with tab7:
+        with export_tab:
             st.subheader("Export Portfolio Data")
             port_var = portfolio_var(returns_df, weights_array, conf_level)
             port_cvar = cvar(port_rets, conf_level)
@@ -1651,10 +2149,11 @@ else:
 # FOOTER
 # ============================================================================
 st.markdown("---")
-st.markdown("""
+enhanced_features = " | Enhanced Analytics | Risk Parity | Black-Litterman" if HAS_ENHANCED_UTILS else ""
+st.markdown(f"""
 <div style='text-align: center; color: #8E8E93; font-size: 0.8rem;'>
-    Stock Risk Model v4.0 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk<br>
-    Options Analytics | Fundamentals | PDF Reports | Alerts | Alpha Vantage Integration<br>
+    Stock Risk Model v4.1 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk<br>
+    Options Analytics | Fundamentals | PDF Reports | Alerts{enhanced_features}<br>
     Built with Streamlit, XGBoost, GARCH, Fama-French | Local Analysis Only
 </div>
 """, unsafe_allow_html=True)
