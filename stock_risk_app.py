@@ -1,5 +1,5 @@
 """
-STOCK RISK MODELLING APP v4.1
+STOCK RISK MODELLING APP v4.2
 ==============================
 Streamlit + yfinance + GARCH + EVT + Monte Carlo + Portfolio Mode + Stress Testing
 + Fama-French Factors + Kelly Criterion + ESG + XGBoost AI VaR
@@ -77,6 +77,14 @@ try:
 except ImportError as e:
     HAS_ENHANCED_UTILS = False
     print(f"Enhanced utils not available: {e}")
+
+# Import TA Signals Extension
+try:
+    from ta_signals_app import render_ta_signals
+    HAS_TA_SIGNALS = True
+except ImportError as e:
+    HAS_TA_SIGNALS = False
+    print(f"TA Signals not available: {e}")
 
 # ============================================================================
 # PAGE CONFIG & STYLING
@@ -310,7 +318,30 @@ with st.sidebar:
         st.warning("⚡ Using GradientBoosting\n(XGBoost unavailable)")
     
     st.divider()
-    st.caption("v4.1" + (" | Enhanced" if HAS_ENHANCED_UTILS else ""))
+    
+    # App Mode Switcher (at bottom of sidebar)
+    st.markdown("### App Mode")
+    if HAS_TA_SIGNALS:
+        app_mode = st.radio(
+            "Select Mode",
+            ["Risk Analysis", "TA Signals"],
+            index=0,
+            key="app_mode_selector",
+            help="Switch between Risk Analysis and Technical Analysis Signals"
+        )
+    else:
+        app_mode = "Risk Analysis"
+        st.info("TA Signals extension not available")
+    
+    st.divider()
+    st.caption("v4.2" + (" | Enhanced" if HAS_ENHANCED_UTILS else "") + (" | TA" if HAS_TA_SIGNALS else ""))
+
+# ============================================================================
+# TA SIGNALS MODE
+# ============================================================================
+if app_mode == "TA Signals" and HAS_TA_SIGNALS:
+    render_ta_signals()
+    st.stop()  # Don't render the rest of the app
 
 # ============================================================================
 # ASSET DEFINITIONS
@@ -2152,7 +2183,7 @@ st.markdown("---")
 enhanced_features = " | Enhanced Analytics | Risk Parity | Black-Litterman" if HAS_ENHANCED_UTILS else ""
 st.markdown(f"""
 <div style='text-align: center; color: #8E8E93; font-size: 0.8rem;'>
-    Stock Risk Model v4.1 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk<br>
+    Stock Risk Model v4.2 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk | TA Signals<br>
     Options Analytics | Fundamentals | PDF Reports | Alerts{enhanced_features}<br>
     Built with Streamlit, XGBoost, GARCH, Fama-French | Local Analysis Only
 </div>

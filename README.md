@@ -5,9 +5,22 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-4.1-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-4.2-brightgreen.svg)
 
-## ✨ What's New in v4.1
+## What's New in v4.2
+
+### TA Signals Extension (NEW)
+Switch between **Risk Analysis** and **TA Signals** modes via the sidebar:
+
+- **Technical Indicators** - SMA, EMA, RSI, MACD, Bollinger Bands, ADX, Stochastic, ATR
+- **Signal Generation** - MA Crossover, RSI, MACD, Bollinger breakouts with 0-100 scoring
+- **Risk-Filtered Signals** - Filter by volatility (<30%), beta (<1.8), Sharpe (>0.3)
+- **Interactive Charts** - Candlestick with indicator overlays and signal markers
+- **Stock Screener** - Scan multiple symbols for active signals
+- **Backtesting** - Test signal performance with equity curves and trade history
+- **Portfolio Signals** - Aggregate signals for portfolio holdings
+
+## What's New in v4.1
 
 ### Enhanced Analytics
 - **VaR Backtesting** - Kupiec and Christoffersen tests for model validation
@@ -172,6 +185,28 @@ Enhanced utilities package:
 - Live quote fetching
 - Market hours detection
 - Real-time P&L tracking
+
+### `services/` (NEW in v4.2)
+TA Signals extension services:
+
+#### `services/ta_service.py`
+- Technical indicator calculations (SMA, EMA, RSI, MACD, etc.)
+- Bollinger Bands, ADX, Stochastic, ATR
+- Indicator summary and interpretation
+
+#### `services/signals_service.py`
+- Signal generation (MA crossover, RSI, MACD, Bollinger)
+- Combined signal scoring (0-100)
+- Risk-based signal filtering
+- Backtesting engine with equity curve tracking
+
+### `ta_signals_app.py` (NEW in v4.2)
+Main TA Signals extension:
+- Candlestick charts with indicators
+- Signal dashboard and history
+- Stock screener
+- Backtest module
+- Portfolio signal aggregation
 
 ## Use Cases
 
