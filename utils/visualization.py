@@ -360,7 +360,7 @@ def animated_price_chart(
                 xanchor="center",
                 buttons=[
                     dict(
-                        label="▶ Play",
+                        label="Play",
                         method="animate",
                         args=[None, {
                             "frame": {"duration": frame_duration},
@@ -849,7 +849,7 @@ def get_download_link(html_content: str, filename: str = "chart.html") -> str:
         HTML anchor tag for download
     """
     b64 = base64.b64encode(html_content.encode()).decode()
-    return f'<a href="data:text/html;base64,{b64}" download="{filename}">📥 Download Chart</a>'
+    return f'<a href="data:text/html;base64,{b64}" download="{filename}">Download Chart</a>'
 
 
 # =============================================================================
@@ -925,7 +925,7 @@ def regime_chart(
         line=dict(color='white', width=2)
     ))
     
-    # Regime coloring
+    # Regime coloring with proper labels
     regime_colors = {
         'Bull': 'rgba(0, 200, 83, 0.2)',
         'Bear': 'rgba(255, 23, 68, 0.2)',
@@ -935,8 +935,20 @@ def regime_chart(
         2: 'rgba(33, 150, 243, 0.2)'
     }
     
-    # Add regime background
+    # Get proper regime names for legend
+    regime_display_names = {
+        'Bull': 'Bull Market',
+        'Bear': 'Bear Market',
+        'Sideways': 'Sideways',
+        0: 'Regime 1',
+        1: 'Regime 2',
+        2: 'Regime 3'
+    }
+    
+    # Add regime background - without annotation text to avoid the new_text issue
     unique_regimes = regimes.unique()
+    legend_added = set()
+    
     for regime in unique_regimes:
         mask = regimes == regime
         if mask.any():
@@ -951,20 +963,37 @@ def regime_chart(
             if start is not None:
                 regime_periods.append((start, mask.index[-1]))
             
-            for start, end in regime_periods:
+            for j, (start, end) in enumerate(regime_periods):
                 fig.add_vrect(
                     x0=start, x1=end,
                     fillcolor=regime_colors.get(regime, 'rgba(128,128,128,0.1)'),
-                    line_width=0,
-                    annotation_text=str(regime) if start == regime_periods[0][0] else None,
-                    annotation_position="top left"
+                    line_width=0
                 )
+    
+    # Add legend entries for regimes
+    for regime in unique_regimes:
+        display_name = regime_display_names.get(regime, str(regime))
+        color = regime_colors.get(regime, 'rgba(128,128,128,0.3)')
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None],
+            mode='markers',
+            marker=dict(size=15, color=color.replace('0.2', '0.8')),
+            name=display_name,
+            showlegend=True
+        ))
     
     fig.update_layout(
         title=dict(text=title, x=0.5),
         xaxis_title="Date",
         yaxis_title="Price",
-        height=500
+        height=500,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
     
     return apply_dark_theme(fig)

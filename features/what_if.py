@@ -485,7 +485,7 @@ def render_what_if_tab(
     portfolio_value: float = 100000
 ):
     """Render the What-If Analysis tab."""
-    st.markdown("### 🎯 What-If Portfolio Analysis")
+    st.markdown("### What-If Portfolio Analysis")
     st.markdown("*Adjust weights interactively and see real-time impact*")
     
     # Initialize analyzer
@@ -498,33 +498,36 @@ def render_what_if_tab(
     current_scenario = analyzer.analyze_scenario(current_weights, "Current")
     
     # Create weight adjustment UI
-    st.markdown("#### 📊 Adjust Portfolio Weights")
+    st.markdown("#### Adjust Portfolio Weights")
     
-    # Initialize session state for weights
+    # Initialize session state for weights (store as 0-100 for display)
     if 'what_if_weights' not in st.session_state:
-        st.session_state.what_if_weights = current_weights.copy()
+        st.session_state.what_if_weights = {k: v * 100 for k, v in current_weights.items()}
     
-    # Weight sliders
-    new_weights = {}
+    # Weight sliders (using 0-100 scale for intuitive percentage display)
+    new_weights_pct = {}
     cols = st.columns(min(4, len(analyzer.assets)))
     
     for i, asset in enumerate(analyzer.assets):
         col_idx = i % len(cols)
         with cols[col_idx]:
-            current_val = current_weights.get(asset, 0)
+            current_val_pct = current_weights.get(asset, 0) * 100
             new_val = st.slider(
                 asset,
                 min_value=0.0,
-                max_value=1.0,
-                value=float(st.session_state.what_if_weights.get(asset, current_val)),
-                step=0.01,
+                max_value=100.0,
+                value=float(st.session_state.what_if_weights.get(asset, current_val_pct)),
+                step=1.0,
                 format="%.0f%%",
                 key=f"weight_{asset}"
             )
-            new_weights[asset] = new_val
+            new_weights_pct[asset] = new_val
     
     # Update session state
-    st.session_state.what_if_weights = new_weights
+    st.session_state.what_if_weights = new_weights_pct
+    
+    # Convert back to 0-1 scale for calculations
+    new_weights = {k: v / 100 for k, v in new_weights_pct.items()}
     
     # Normalize weights
     total_weight = sum(new_weights.values())
@@ -536,20 +539,20 @@ def render_what_if_tab(
     # Weight sum indicator
     col1, col2, col3 = st.columns(3)
     with col1:
-        weight_color = "🟢" if abs(total_weight - 1.0) < 0.01 else "🟡" if total_weight > 0 else "🔴"
+        weight_color = "OK" if abs(total_weight - 1.0) < 0.01 else "WARN" if total_weight > 0 else "ERR"
         st.metric("Total Weight", f"{total_weight * 100:.1f}%", 
                   delta=f"{(total_weight - 1.0) * 100:+.1f}%" if total_weight != 1 else None)
     
     # Quick actions
     with col2:
-        if st.button("🔄 Reset to Current"):
-            st.session_state.what_if_weights = current_weights.copy()
+        if st.button("Reset to Current", key="what_if_reset"):
+            st.session_state.what_if_weights = {k: v * 100 for k, v in current_weights.items()}
             st.rerun()
     
     with col3:
-        if st.button("⚡ Equal Weight"):
-            eq_weight = 1.0 / len(analyzer.assets)
-            st.session_state.what_if_weights = {a: eq_weight for a in analyzer.assets}
+        if st.button("Equal Weight", key="what_if_equal"):
+            eq_weight_pct = 100.0 / len(analyzer.assets)
+            st.session_state.what_if_weights = {a: eq_weight_pct for a in analyzer.assets}
             st.rerun()
     
     st.divider()
@@ -558,7 +561,7 @@ def render_what_if_tab(
     proposed_scenario = analyzer.analyze_scenario(normalized_weights, "Proposed")
     
     # Side-by-side comparison
-    st.markdown("#### 📈 Impact Analysis")
+    st.markdown("#### Impact Analysis")
     
     col1, col2 = st.columns(2)
     
@@ -588,7 +591,7 @@ def render_what_if_tab(
                   delta=f"{var_delta:+.1f}%", delta_color="inverse")
     
     # Visualizations
-    tab1, tab2, tab3 = st.tabs(["📊 Comparison", "📈 Frontier", "💱 Trades"])
+    tab1, tab2, tab3 = st.tabs(["Comparison", "Frontier", "Trades"])
     
     with tab1:
         col1, col2 = st.columns(2)
@@ -647,7 +650,7 @@ def render_what_if_tab(
             )
             
             # Detailed trade list
-            with st.expander("📋 Detailed Trade List"):
+            with st.expander("Detailed Trade List"):
                 df = pd.DataFrame(trades)
                 df['current_weight'] = df['current_weight'].apply(lambda x: f"{x*100:.1f}%")
                 df['new_weight'] = df['new_weight'].apply(lambda x: f"{x*100:.1f}%")
@@ -663,26 +666,26 @@ def render_what_if_tab(
     
     # Optimization helpers
     st.divider()
-    st.markdown("#### 🎯 Quick Optimization")
+    st.markdown("#### Quick Optimization")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("📈 Maximize Sharpe"):
+        if st.button("Maximize Sharpe"):
             opt_weights = analyzer.optimize_for_target()
             st.session_state.what_if_weights = opt_weights
             st.rerun()
     
     with col2:
         target_ret = st.slider("Target Return", 0.0, 0.30, 0.10, format="%.0f%%")
-        if st.button("🎯 Target Return"):
+        if st.button("Target Return"):
             opt_weights = analyzer.optimize_for_target(target_return=target_ret)
             st.session_state.what_if_weights = opt_weights
             st.rerun()
     
     with col3:
         target_vol = st.slider("Target Volatility", 0.05, 0.30, 0.15, format="%.0f%%")
-        if st.button("🛡️ Target Volatility"):
+        if st.button("Target Volatility"):
             opt_weights = analyzer.optimize_for_target(target_volatility=target_vol)
             st.session_state.what_if_weights = opt_weights
             st.rerun()
@@ -690,14 +693,14 @@ def render_what_if_tab(
 
 def render_scenario_builder():
     """Render scenario builder in sidebar."""
-    st.sidebar.markdown("### 📦 Saved Scenarios")
+    st.sidebar.markdown("### Saved Scenarios")
     
     if 'saved_scenarios' not in st.session_state:
         st.session_state.saved_scenarios = []
     
     # Save current scenario
     scenario_name = st.sidebar.text_input("Scenario Name")
-    if st.sidebar.button("💾 Save Current") and scenario_name:
+    if st.sidebar.button("Save Current") and scenario_name:
         if 'what_if_weights' in st.session_state:
             st.session_state.saved_scenarios.append({
                 'name': scenario_name,
@@ -710,10 +713,10 @@ def render_scenario_builder():
         for i, scenario in enumerate(st.session_state.saved_scenarios):
             col1, col2 = st.sidebar.columns([3, 1])
             with col1:
-                if st.button(f"📂 {scenario['name']}", key=f"load_{i}"):
+                if st.button(f"Load {scenario['name']}", key=f"load_{i}"):
                     st.session_state.what_if_weights = scenario['weights'].copy()
                     st.rerun()
             with col2:
-                if st.button("🗑️", key=f"delete_{i}"):
+                if st.button("Delete", key=f"delete_{i}"):
                     st.session_state.saved_scenarios.pop(i)
                     st.rerun()

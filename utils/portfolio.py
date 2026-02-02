@@ -11,7 +11,7 @@ Advanced portfolio optimization features:
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Dict, List, Tuple, Optional, Union, Any
 from scipy.optimize import minimize, LinearConstraint
 from scipy.stats import norm
 from dataclasses import dataclass
@@ -1473,3 +1473,275 @@ class CorrelationMonitor:
             dates.append(self.returns.index[i])
         
         return pd.Series(rolling_corr, index=dates, name='avg_correlation')
+
+
+# =============================================================================
+# LIQUIDITY RISK ENGINE (v4.3 Professional)
+# =============================================================================
+
+@dataclass
+class LiquidityMetrics:
+    """Container for liquidity risk metrics."""
+    time_to_liquidate_days: float
+    market_impact_bps: float
+    liquidity_score: float  # 0-100
+    liquidity_grade: str  # A, B, C, D, F
+    warning_level: str  # none, low, medium, high, critical
+    participation_rate: float
+    slippage_estimate_pct: float
+
+
+def calculate_liquidity_risk(
+    positions: Dict[str, float],
+    volumes: Dict[str, float],
+    prices: Dict[str, float] = None,
+    participation_rate: float = 0.10,
+    urgency: str = 'normal'
+) -> Dict[str, Any]:
+    """
+    Calculate comprehensive liquidity risk metrics.
+    
+    Computes Time to Liquidate (TTL), Market Impact, and slippage estimates
+    based on Average Daily Volume (ADV) and position sizes.
+    
+    Args:
+        positions: Dict of {ticker: position_value_or_shares}
+        volumes: Dict of {ticker: average_daily_volume}
+        prices: Dict of {ticker: current_price} (optional, for dollar calculations)
+        participation_rate: Max % of ADV to trade (default 10%)
+        urgency: 'low', 'normal', 'high', 'urgent' - affects impact estimates
+    
+    Returns:
+        Dictionary with liquidity metrics and warnings
+    """
+    if not positions or not volumes:
+        return {'error': 'Missing positions or volume data'}
+    
+    # Urgency multipliers for market impact
+    urgency_factors = {
+        'low': 0.5,      # Patient trading, minimal impact
+        'normal': 1.0,   # Standard execution
+        'high': 1.5,     # Need to execute faster
+        'urgent': 2.5    # Liquidation pressure, maximum impact
+    }
+    urgency_mult = urgency_factors.get(urgency, 1.0)
+    
+    results = {}
+    total_value = 0
+    total_ttl_weighted = 0
+    total_impact_weighted = 0
+    warnings = []
+    
+    for ticker, position in positions.items():
+        adv = volumes.get(ticker, 0)
+        price = prices.get(ticker, 100) if prices else 100
+        
+        # Convert position to shares if value provided
+        if isinstance(position, float) and position > 1000:
+            # Assume it's a dollar value
+            shares = position / price
+            position_value = position
+        else:
+            shares = position
+            position_value = shares * price
+        
+        total_value += position_value
+        
+        # Skip if no volume data
+        if adv <= 0:
+            results[ticker] = {
+                'error': 'No volume data',
+                'ttl_days': float('inf'),
+                'liquidity_score': 0
+            }
+            warnings.append({
+                'ticker': ticker,
+                'level': 'critical',
+                'message': 'No volume data available'
+            })
+            continue
+        
+        # Time to Liquidate (days)
+        daily_tradeable = adv * participation_rate
+        ttl_days = shares / daily_tradeable if daily_tradeable > 0 else float('inf')
+        
+        # Market Impact Estimate (basis points)
+        # Using square-root market impact model: Impact ≈ k * sqrt(shares / ADV)
+        impact_coefficient = 10.0  # Base impact in bps
+        raw_impact = impact_coefficient * np.sqrt(shares / adv) * 100
+        market_impact_bps = raw_impact * urgency_mult
+        
+        # Slippage estimate (percentage)
+        slippage_pct = market_impact_bps / 100
+        
+        # Liquidity score (0-100, higher = more liquid)
+        # Based on TTL and relative position size
+        position_pct_of_adv = (shares / adv) * 100
+        if ttl_days <= 0.5:
+            liquidity_score = 95
+        elif ttl_days <= 1:
+            liquidity_score = 85
+        elif ttl_days <= 3:
+            liquidity_score = 70
+        elif ttl_days <= 5:
+            liquidity_score = 50
+        elif ttl_days <= 10:
+            liquidity_score = 30
+        else:
+            liquidity_score = max(0, 20 - ttl_days)
+        
+        # Liquidity grade
+        if liquidity_score >= 80:
+            grade = 'A'
+        elif liquidity_score >= 60:
+            grade = 'B'
+        elif liquidity_score >= 40:
+            grade = 'C'
+        elif liquidity_score >= 20:
+            grade = 'D'
+        else:
+            grade = 'F'
+        
+        # Warning level
+        if ttl_days > 5:
+            warning_level = 'critical'
+            warnings.append({
+                'ticker': ticker,
+                'level': 'critical',
+                'message': f'Liquidation takes >{ttl_days:.1f} days (exceeds 5-day threshold)'
+            })
+        elif ttl_days > 3:
+            warning_level = 'high'
+            warnings.append({
+                'ticker': ticker,
+                'level': 'high',
+                'message': f'Liquidation takes {ttl_days:.1f} days (>3 days)'
+            })
+        elif ttl_days > 1:
+            warning_level = 'medium'
+        elif ttl_days > 0.5:
+            warning_level = 'low'
+        else:
+            warning_level = 'none'
+        
+        results[ticker] = {
+            'position_value': float(position_value),
+            'shares': float(shares),
+            'adv': float(adv),
+            'ttl_days': float(ttl_days),
+            'market_impact_bps': float(market_impact_bps),
+            'slippage_pct': float(slippage_pct),
+            'liquidity_score': float(liquidity_score),
+            'grade': grade,
+            'warning_level': warning_level,
+            'pct_of_adv': float(position_pct_of_adv)
+        }
+        
+        # Weighted aggregates
+        total_ttl_weighted += ttl_days * position_value
+        total_impact_weighted += market_impact_bps * position_value
+    
+    # Portfolio-level metrics
+    if total_value > 0:
+        portfolio_ttl = total_ttl_weighted / total_value
+        portfolio_impact = total_impact_weighted / total_value
+    else:
+        portfolio_ttl = 0
+        portfolio_impact = 0
+    
+    # Portfolio liquidity score
+    portfolio_score = np.mean([r['liquidity_score'] for r in results.values() if 'liquidity_score' in r])
+    
+    # Portfolio warning
+    if portfolio_ttl > 5:
+        portfolio_warning = 'critical'
+    elif portfolio_ttl > 3:
+        portfolio_warning = 'high'
+    elif portfolio_ttl > 1:
+        portfolio_warning = 'medium'
+    else:
+        portfolio_warning = 'low'
+    
+    return {
+        'positions': results,
+        'portfolio': {
+            'total_value': float(total_value),
+            'weighted_ttl_days': float(portfolio_ttl),
+            'weighted_impact_bps': float(portfolio_impact),
+            'liquidity_score': float(portfolio_score),
+            'warning_level': portfolio_warning,
+            'participation_rate': participation_rate,
+            'urgency': urgency
+        },
+        'warnings': warnings,
+        'n_warnings': len(warnings),
+        'requires_attention': portfolio_ttl > 3 or len([w for w in warnings if w['level'] == 'critical']) > 0
+    }
+
+
+def estimate_execution_cost(
+    position_value: float,
+    adv_value: float,
+    volatility: float = 0.02,
+    urgency: str = 'normal',
+    spread_bps: float = 5.0
+) -> Dict[str, float]:
+    """
+    Estimate total execution cost for a trade.
+    
+    Uses Almgren-Chriss inspired market impact model.
+    
+    Args:
+        position_value: Dollar value to trade
+        adv_value: Average daily volume in dollars
+        volatility: Daily volatility of the asset
+        urgency: Trading urgency level
+        spread_bps: Bid-ask spread in basis points
+    
+    Returns:
+        Dictionary with cost breakdown
+    """
+    # Participation rate based on urgency
+    urgency_participation = {
+        'low': 0.05,
+        'normal': 0.10,
+        'high': 0.20,
+        'urgent': 0.30
+    }
+    participation = urgency_participation.get(urgency, 0.10)
+    
+    # Time to execute
+    execution_days = position_value / (adv_value * participation)
+    
+    # Permanent impact (price moves against you permanently)
+    # γ * σ * sqrt(X/V) where X=shares, V=ADV
+    permanent_impact_coef = 0.1
+    permanent_impact = permanent_impact_coef * volatility * np.sqrt(position_value / adv_value)
+    
+    # Temporary impact (decays after trade)
+    # η * σ * (X/V)^0.6
+    temporary_impact_coef = 0.05
+    temporary_impact = temporary_impact_coef * volatility * (position_value / adv_value) ** 0.6
+    
+    # Timing risk (variance of execution price)
+    timing_risk = volatility * np.sqrt(execution_days) * position_value
+    
+    # Spread cost
+    spread_cost = position_value * (spread_bps / 10000)
+    
+    # Total cost
+    total_impact = (permanent_impact + temporary_impact) * position_value
+    total_cost = total_impact + spread_cost
+    total_cost_bps = (total_cost / position_value) * 10000
+    
+    return {
+        'execution_days': float(execution_days),
+        'permanent_impact_pct': float(permanent_impact * 100),
+        'temporary_impact_pct': float(temporary_impact * 100),
+        'spread_cost': float(spread_cost),
+        'timing_risk': float(timing_risk),
+        'total_impact_cost': float(total_impact),
+        'total_cost': float(total_cost),
+        'total_cost_bps': float(total_cost_bps),
+        'participation_rate': participation
+    }

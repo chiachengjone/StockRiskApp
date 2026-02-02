@@ -1,7 +1,7 @@
 """
 Factor Analysis Module - Enterprise Features
 =============================================
-Fama-French 5-Factor • Kelly Criterion • ESG Ratings
+Fama-French 5-Factor • Kelly Criterion • ESG Ratings • Style Factors
 
 Author: Professional Risk Analytics | Jan 2026
 """
@@ -9,8 +9,366 @@ Author: Professional Risk Analytics | Jan 2026
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from typing import Dict, List, Optional, Any, Union
 import warnings
 warnings.filterwarnings('ignore')
+
+
+# =============================================================================
+# STYLE FACTOR ANALYZER (v4.3 Professional)
+# =============================================================================
+
+class StyleFactorAnalyzer:
+    """
+    Multi-Factor Style Analysis for institutional portfolio management.
+    
+    Computes Momentum, Value, and Quality factors with historical benchmarking
+    and radar chart visualization support.
+    
+    Factors:
+    - Momentum: Price momentum, RSI, trend strength
+    - Value: P/E, P/B, dividend yield relative to sector
+    - Quality: ROE, profit margins, debt ratios
+    """
+    
+    def __init__(self):
+        self.factor_cache = {}
+        self.benchmark_data = {}
+    
+    def analyze_style_factors(
+        self, 
+        returns: pd.Series,
+        prices: pd.Series,
+        fundamentals: Dict[str, Any] = None,
+        benchmark_returns: pd.Series = None
+    ) -> Dict[str, Any]:
+        """
+        Compute comprehensive style factor analysis.
+        
+        Args:
+            returns: Daily log returns
+            prices: Price series
+            fundamentals: Company fundamentals dict
+            benchmark_returns: Benchmark for relative metrics
+        
+        Returns:
+            Dictionary with momentum, value, quality scores and radar chart data
+        """
+        if len(returns) < 60:
+            return {'error': 'Insufficient data for style analysis (need 60+ days)'}
+        
+        # Compute individual factor categories
+        momentum = self._compute_momentum_factors(returns, prices)
+        value = self._compute_value_factors(fundamentals)
+        quality = self._compute_quality_factors(fundamentals)
+        
+        # Compute composite scores (normalized 0-100)
+        scores = {
+            'momentum': self._normalize_score(momentum.get('composite', 50)),
+            'value': self._normalize_score(value.get('composite', 50)),
+            'quality': self._normalize_score(quality.get('composite', 50)),
+        }
+        
+        # Add relative performance if benchmark provided
+        if benchmark_returns is not None and len(benchmark_returns) > 20:
+            relative = self._compute_relative_performance(returns, benchmark_returns)
+            scores['relative_strength'] = self._normalize_score(relative.get('score', 50))
+        else:
+            scores['relative_strength'] = 50.0
+        
+        # Overall style score
+        overall_score = np.mean([scores['momentum'], scores['value'], scores['quality']])
+        
+        # Radar chart data (for Plotly radar visualization)
+        radar_data = {
+            'categories': ['Momentum', 'Value', 'Quality', 'Relative Strength'],
+            'scores': [
+                scores['momentum'], 
+                scores['value'], 
+                scores['quality'],
+                scores['relative_strength']
+            ]
+        }
+        
+        # Style classification
+        style = self._classify_style(scores)
+        
+        return {
+            'overall_score': float(overall_score),
+            'scores': scores,
+            'momentum_details': momentum,
+            'value_details': value,
+            'quality_details': quality,
+            'radar_data': radar_data,
+            'style_classification': style,
+            'style_label': self._get_style_label(style)
+        }
+    
+    def _compute_momentum_factors(
+        self, 
+        returns: pd.Series, 
+        prices: pd.Series
+    ) -> Dict[str, float]:
+        """
+        Compute momentum factor metrics.
+        
+        Metrics:
+        - 12M-1M momentum (skip most recent month)
+        - 3M momentum
+        - RSI (14-day)
+        - Trend strength (ADX proxy)
+        """
+        n = len(returns)
+        
+        # Price momentum
+        mom_12m_1m = 0.0
+        if len(prices) >= 252:
+            # 12-month return excluding last month
+            price_12m_ago = prices.iloc[-252]
+            price_1m_ago = prices.iloc[-21]
+            price_now = prices.iloc[-1]
+            mom_12m_1m = ((price_1m_ago / price_12m_ago) - 1) * 100
+        
+        mom_3m = 0.0
+        if len(prices) >= 63:
+            mom_3m = ((prices.iloc[-1] / prices.iloc[-63]) - 1) * 100
+        
+        mom_1m = 0.0
+        if len(prices) >= 21:
+            mom_1m = ((prices.iloc[-1] / prices.iloc[-21]) - 1) * 100
+        
+        # RSI calculation
+        rsi = self._compute_rsi(prices, 14)
+        
+        # Trend strength (simplified using volatility-adjusted momentum)
+        vol = returns.tail(20).std() * np.sqrt(252)
+        trend_strength = abs(mom_3m) / (vol * 100) if vol > 0 else 0
+        trend_strength = min(trend_strength * 50, 100)  # Scale to 0-100
+        
+        # Composite momentum score
+        # Weight: 40% 12M-1M, 30% 3M, 20% RSI normalization, 10% trend
+        rsi_normalized = (rsi - 50) + 50  # Center around 50
+        composite = (
+            0.4 * self._normalize_score(mom_12m_1m, center=0, scale=50) +
+            0.3 * self._normalize_score(mom_3m, center=0, scale=30) +
+            0.2 * rsi_normalized +
+            0.1 * trend_strength
+        )
+        
+        return {
+            'momentum_12m_1m': float(mom_12m_1m),
+            'momentum_3m': float(mom_3m),
+            'momentum_1m': float(mom_1m),
+            'rsi_14': float(rsi),
+            'trend_strength': float(trend_strength),
+            'composite': float(composite)
+        }
+    
+    def _compute_value_factors(
+        self, 
+        fundamentals: Dict[str, Any] = None
+    ) -> Dict[str, float]:
+        """
+        Compute value factor metrics.
+        
+        Metrics:
+        - P/E ratio (inverse, lower = better)
+        - P/B ratio (inverse)
+        - Dividend yield
+        - Free cash flow yield
+        """
+        if not fundamentals:
+            return {'composite': 50.0, 'note': 'No fundamentals data'}
+        
+        # Extract metrics
+        pe = fundamentals.get('trailingPE') or fundamentals.get('forwardPE')
+        pb = fundamentals.get('priceToBook')
+        div_yield = fundamentals.get('dividendYield', 0) or 0
+        fcf_yield = fundamentals.get('freeCashflowYield', 0) or 0
+        
+        # Score each metric (higher = better value)
+        pe_score = 50.0
+        if pe is not None and pe > 0:
+            # Lower P/E = higher score. P/E of 15 = neutral, <10 = great, >30 = poor
+            pe_score = max(0, min(100, 100 - (pe - 10) * 3))
+        
+        pb_score = 50.0
+        if pb is not None and pb > 0:
+            # P/B < 1 = undervalued, > 3 = expensive
+            pb_score = max(0, min(100, 100 - (pb - 1) * 20))
+        
+        div_score = 50.0
+        if div_yield > 0:
+            # Dividend yield 0% = 50, 5%+ = 100
+            div_score = min(100, 50 + div_yield * 1000)
+        
+        # Composite value score
+        composite = 0.4 * pe_score + 0.35 * pb_score + 0.25 * div_score
+        
+        return {
+            'pe_ratio': pe,
+            'pb_ratio': pb,
+            'dividend_yield': div_yield * 100 if div_yield else 0,
+            'pe_score': float(pe_score),
+            'pb_score': float(pb_score),
+            'div_score': float(div_score),
+            'composite': float(composite)
+        }
+    
+    def _compute_quality_factors(
+        self, 
+        fundamentals: Dict[str, Any] = None
+    ) -> Dict[str, float]:
+        """
+        Compute quality factor metrics.
+        
+        Metrics:
+        - Return on Equity (ROE)
+        - Profit margins
+        - Debt-to-equity ratio (inverse)
+        - Earnings stability
+        """
+        if not fundamentals:
+            return {'composite': 50.0, 'note': 'No fundamentals data'}
+        
+        # Extract metrics
+        roe = fundamentals.get('returnOnEquity')
+        profit_margin = fundamentals.get('profitMargins')
+        debt_equity = fundamentals.get('debtToEquity')
+        gross_margin = fundamentals.get('grossMargins')
+        
+        # Score each metric
+        roe_score = 50.0
+        if roe is not None:
+            # ROE > 15% is excellent, < 5% is poor
+            roe_pct = roe * 100 if roe < 1 else roe
+            roe_score = max(0, min(100, 30 + roe_pct * 3.5))
+        
+        margin_score = 50.0
+        if profit_margin is not None:
+            margin_pct = profit_margin * 100 if profit_margin < 1 else profit_margin
+            margin_score = max(0, min(100, margin_pct * 4))
+        
+        debt_score = 50.0
+        if debt_equity is not None and debt_equity >= 0:
+            # D/E < 50 = good, > 150 = risky
+            debt_score = max(0, min(100, 100 - debt_equity * 0.5))
+        
+        gross_score = 50.0
+        if gross_margin is not None:
+            gross_pct = gross_margin * 100 if gross_margin < 1 else gross_margin
+            gross_score = max(0, min(100, gross_pct * 1.5))
+        
+        # Composite quality score
+        composite = 0.35 * roe_score + 0.25 * margin_score + 0.2 * debt_score + 0.2 * gross_score
+        
+        return {
+            'roe': roe,
+            'profit_margin': profit_margin,
+            'debt_equity': debt_equity,
+            'gross_margin': gross_margin,
+            'roe_score': float(roe_score),
+            'margin_score': float(margin_score),
+            'debt_score': float(debt_score),
+            'composite': float(composite)
+        }
+    
+    def _compute_relative_performance(
+        self, 
+        returns: pd.Series, 
+        benchmark_returns: pd.Series
+    ) -> Dict[str, float]:
+        """Compute relative strength vs benchmark."""
+        aligned = pd.DataFrame({
+            'stock': returns, 
+            'bench': benchmark_returns
+        }).dropna()
+        
+        if len(aligned) < 20:
+            return {'score': 50.0}
+        
+        # Cumulative returns
+        stock_cum = (1 + aligned['stock']).cumprod().iloc[-1] - 1
+        bench_cum = (1 + aligned['bench']).cumprod().iloc[-1] - 1
+        
+        excess = stock_cum - bench_cum
+        
+        # Score based on excess return
+        score = 50 + excess * 200  # +10% excess = score of 70
+        score = max(0, min(100, score))
+        
+        return {
+            'stock_return': float(stock_cum),
+            'benchmark_return': float(bench_cum),
+            'excess_return': float(excess),
+            'score': float(score)
+        }
+    
+    def _compute_rsi(self, prices: pd.Series, period: int = 14) -> float:
+        """Compute RSI."""
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        
+        if loss.iloc[-1] == 0:
+            return 100.0
+        
+        rs = gain.iloc[-1] / loss.iloc[-1]
+        rsi = 100 - (100 / (1 + rs))
+        return float(rsi)
+    
+    def _normalize_score(
+        self, 
+        value: float, 
+        center: float = 50, 
+        scale: float = 50
+    ) -> float:
+        """Normalize a value to 0-100 scale."""
+        normalized = center + (value / scale) * 50
+        return max(0, min(100, normalized))
+    
+    def _classify_style(self, scores: Dict[str, float]) -> Dict[str, str]:
+        """Classify investment style based on factor scores."""
+        classification = {}
+        
+        # Momentum classification
+        if scores['momentum'] >= 70:
+            classification['momentum'] = 'High Momentum'
+        elif scores['momentum'] <= 30:
+            classification['momentum'] = 'Low Momentum'
+        else:
+            classification['momentum'] = 'Neutral'
+        
+        # Value classification
+        if scores['value'] >= 70:
+            classification['value'] = 'Deep Value'
+        elif scores['value'] <= 30:
+            classification['value'] = 'Growth'
+        else:
+            classification['value'] = 'Blend'
+        
+        # Quality classification
+        if scores['quality'] >= 70:
+            classification['quality'] = 'High Quality'
+        elif scores['quality'] <= 30:
+            classification['quality'] = 'Speculative'
+        else:
+            classification['quality'] = 'Average Quality'
+        
+        return classification
+    
+    def _get_style_label(self, classification: Dict[str, str]) -> str:
+        """Get a simple style label."""
+        if classification.get('value') == 'Growth' and classification.get('momentum') == 'High Momentum':
+            return 'Growth Momentum'
+        elif classification.get('value') == 'Deep Value':
+            return 'Value'
+        elif classification.get('quality') == 'High Quality':
+            return 'Quality'
+        elif classification.get('momentum') == 'High Momentum':
+            return 'Momentum'
+        else:
+            return 'Blend'
 
 
 class FactorAnalyzer:

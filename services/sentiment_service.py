@@ -1006,7 +1006,7 @@ def display_sentiment_dashboard(
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            color = "🟢" if result.overall_score > 0 else "🔴" if result.overall_score < 0 else "🟡"
+            color = "[+]" if result.overall_score > 0 else "[-]" if result.overall_score < 0 else "[~]"
             st.metric(
                 "Overall Sentiment",
                 f"{color} {result.overall_label.value.replace('_', ' ').title()}"
@@ -1016,7 +1016,7 @@ def display_sentiment_dashboard(
             st.metric("Score", f"{result.overall_score:.2f}")
         
         with col3:
-            trend_icon = "📈" if result.trending_score > 0 else "📉" if result.trending_score < 0 else "➡️"
+            trend_icon = "UP" if result.trending_score > 0 else "DOWN" if result.trending_score < 0 else "NEUTRAL"
             st.metric("Trend", f"{trend_icon} {result.trending_score:.2f}")
         
         with col4:
@@ -1033,6 +1033,6 @@ def display_sentiment_dashboard(
         if result.articles:
             st.subheader("Recent News")
             for article in result.articles[:5]:
-                sentiment_emoji = "🟢" if article.sentiment_score > 0.2 else "🔴" if article.sentiment_score < -0.2 else "🟡"
+                sentiment_emoji = "[+]" if article.sentiment_score > 0.2 else "[-]" if article.sentiment_score < -0.2 else "[~]"
                 st.markdown(f"{sentiment_emoji} **{article.title}**")
                 st.caption(f"{article.source} • Score: {article.sentiment_score:.2f}")

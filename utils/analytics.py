@@ -130,10 +130,10 @@ def backtest_var_kupiec(
     
     if result['p_value'] < alpha:
         result['conclusion'] = f"Reject H0 (p={result['p_value']:.4f} < {alpha})"
-        result['model_status'] = '❌ VaR model inadequate'
+        result['model_status'] = 'VaR model inadequate'
     else:
         result['conclusion'] = f"Fail to reject H0 (p={result['p_value']:.4f} >= {alpha})"
-        result['model_status'] = '✓ VaR model adequate'
+        result['model_status'] = 'VaR model adequate'
     
     # Additional assessment based on violation ratio
     ratio = result['violation_rate'] / result['expected_rate'] if result['expected_rate'] > 0 else 0
@@ -233,8 +233,8 @@ def backtest_var_christoffersen(
         'conditional_p': float(p_value_cc),
         'p01': float(p01),  # P(violation | no previous violation)
         'p11': float(p11),  # P(violation | previous violation)
-        'independence_status': '✓ Independent' if p_value_ind >= 0.05 else '❌ Dependent (clustering)',
-        'overall_status': '✓ Model adequate' if p_value_cc >= 0.05 else '❌ Model inadequate'
+        'independence_status': 'Independent' if p_value_ind >= 0.05 else 'Dependent (clustering)',
+        'overall_status': 'Model adequate' if p_value_cc >= 0.05 else 'Model inadequate'
     }
 
 # ============================================================================
@@ -674,10 +674,10 @@ def rolling_correlation_breakdown(
         
         if corr_increase > 0.1:
             result['crisis_vs_normal']['interpretation'] = \
-                '⚠️ Correlations increase significantly during crises (diversification breakdown)'
+                'Warning: Correlations increase significantly during crises (diversification breakdown)'
         else:
             result['crisis_vs_normal']['interpretation'] = \
-                '✓ Correlations stable during crises (diversification holds)'
+                'Correlations stable during crises (diversification holds)'
     
     return result
 

@@ -31,7 +31,9 @@ from .portfolio import (
     PortfolioOptimizer, quick_portfolio_optimize,
     portfolio_risk_decomposition,
     SimulationConfig, PortfolioSimulator, DynamicRebalancer,
-    CorrelationMonitor
+    CorrelationMonitor,
+    # v4.3 Liquidity Risk
+    LiquidityMetrics, calculate_liquidity_risk, estimate_execution_cost
 )
 
 from .visualization import (
@@ -53,6 +55,13 @@ from .realtime import (
     PriceStream, RealtimeEngine, MARKET_SCHEDULES,
     WebSocketPriceStream, RealTimePriceAggregator,
     create_realtime_dashboard, display_websocket_status
+)
+
+# v4.3 Instrument Metadata
+from .instrument_metadata import (
+    InstrumentMetadataHandler, get_metadata_handler,
+    ETFMetadata, OptionMetadata, EquityMetadata,
+    AssetClass, ETFCategory, ETF_METADATA_DB
 )
 
 __all__ = [
@@ -81,6 +90,8 @@ __all__ = [
     'portfolio_risk_decomposition',
     'SimulationConfig', 'PortfolioSimulator', 'DynamicRebalancer',
     'CorrelationMonitor',
+    # v4.3 Liquidity Risk
+    'LiquidityMetrics', 'calculate_liquidity_risk', 'estimate_execution_cost',
     
     # Visualization
     'interactive_correlation_heatmap', 'rolling_correlation_chart',
@@ -100,5 +111,10 @@ __all__ = [
     'PriceStream', 'RealtimeEngine', 'MARKET_SCHEDULES',
     'WebSocketPriceStream', 'RealTimePriceAggregator',
     'create_realtime_dashboard', 'display_websocket_status',
+    
+    # v4.3 Instrument Metadata
+    'InstrumentMetadataHandler', 'get_metadata_handler',
+    'ETFMetadata', 'OptionMetadata', 'EquityMetadata',
+    'AssetClass', 'ETFCategory', 'ETF_METADATA_DB',
 ]
 

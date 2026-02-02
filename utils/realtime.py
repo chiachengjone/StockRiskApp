@@ -118,13 +118,13 @@ def is_market_open(exchange: str = 'NYSE', include_extended: bool = False) -> Di
     
     # Check if it's a trading day
     if current_day not in schedule['trading_days']:
-        result['message'] = f"🔴 Market CLOSED (Weekend)"
+        result['message'] = f"Market CLOSED (Weekend)"
         result['session'] = 'weekend'
         return result
     
     # Check holidays (US markets only)
     if exchange in ['NYSE', 'NASDAQ'] and current_date in US_HOLIDAYS:
-        result['message'] = f"🔴 Market CLOSED (Holiday)"
+        result['message'] = f"Market CLOSED (Holiday)"
         result['session'] = 'holiday'
         return result
     
@@ -132,7 +132,7 @@ def is_market_open(exchange: str = 'NYSE', include_extended: bool = False) -> Di
     if exchange == 'CRYPTO':
         result['is_open'] = True
         result['session'] = 'regular'
-        result['message'] = "🟢 CRYPTO Market OPEN 24/7"
+        result['message'] = "CRYPTO Market OPEN 24/7"
         return result
     
     # Check trading hours
@@ -142,7 +142,7 @@ def is_market_open(exchange: str = 'NYSE', include_extended: bool = False) -> Di
     if market_open <= current_time < market_close:
         result['is_open'] = True
         result['session'] = 'regular'
-        result['message'] = f"🟢 Market OPEN (Regular hours)"
+        result['message'] = f"Market OPEN (Regular hours)"
         
         # Calculate time until close
         close_dt = datetime.combine(now.date(), market_close)
@@ -155,15 +155,15 @@ def is_market_open(exchange: str = 'NYSE', include_extended: bool = False) -> Di
         if pre_open <= current_time < market_open:
             result['is_open'] = True
             result['session'] = 'pre_market'
-            result['message'] = "🟡 PRE-MARKET Open"
+            result['message'] = "PRE-MARKET Open"
         elif market_close <= current_time < after_close:
             result['is_open'] = True
             result['session'] = 'after_hours'
-            result['message'] = "🟡 AFTER-HOURS Open"
+            result['message'] = "AFTER-HOURS Open"
         else:
-            result['message'] = f"🔴 Market CLOSED"
+            result['message'] = f"Market CLOSED"
     else:
-        result['message'] = f"🔴 Market CLOSED"
+        result['message'] = f"Market CLOSED"
     
     return result
 
@@ -1037,9 +1037,9 @@ def display_websocket_status(stream: WebSocketPriceStream):
     
     if stats.get('connected_since'):
         uptime = datetime.now() - stats['connected_since']
-        st.success(f"🟢 Connected ({uptime.seconds}s)")
+        st.success(f"Connected ({uptime.seconds}s)")
     else:
-        st.error("🔴 Disconnected")
+        st.error("Disconnected")
     
     col1, col2, col3 = st.columns(3)
     col1.metric("Messages", stats['messages_received'])

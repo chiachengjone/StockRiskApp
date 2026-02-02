@@ -6,7 +6,7 @@ Combines multiple data providers with fallback, validation, and caching.
 
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import logging
 from datetime import datetime, timedelta
 import hashlib
@@ -39,6 +39,7 @@ class DataAggregator:
     - Caching to reduce API calls
     - Rate limit management
     - Support for professional APIs (Polygon.io, Alpaca)
+    - Transparent source metadata
     """
     
     def __init__(
@@ -79,23 +80,35 @@ class DataAggregator:
         os.makedirs(self.cache_dir, exist_ok=True)
         self.cache_ttl_minutes = 60
         
-        # Statistics
+        # Statistics & metadata tracking
         self.stats = {
             'requests': 0,
             'cache_hits': 0,
             'fallbacks': 0,
             'failures': 0
         }
+        
+        # Current data source tracking (for UI transparency)
+        self._current_source = 'none'
+        self._source_history = []
     
     def _build_provider_order(self) -> List[str]:
-        """Build provider priority order based on available APIs."""
+        """
+        Build provider priority order based on available APIs.
+        
+        Priority (Institutional-first):
+        1. Alpaca (sub-second updates, high reliability)
+        2. Polygon (comprehensive, real-time)
+        3. Yahoo (free fallback)
+        4. Alpha Vantage (API key required)
+        """
         order = []
         
-        # Professional APIs first (lower latency, higher reliability)
-        if 'polygon' in self.providers:
-            order.append('polygon')
+        # Professional APIs first (Alpaca has priority for institutional use)
         if 'alpaca' in self.providers:
             order.append('alpaca')
+        if 'polygon' in self.providers:
+            order.append('polygon')
         
         # Free sources as fallback
         order.append('yahoo')
@@ -103,6 +116,35 @@ class DataAggregator:
             order.append('alpha_vantage')
         
         return order
+    
+    def get_current_source(self) -> Dict[str, Any]:
+        """
+        Get current data source information for UI transparency.
+        
+        Returns:
+            Dictionary with source name, is_premium, and status
+        """
+        premium_sources = {'alpaca', 'polygon'}
+        
+        return {
+            'source': self._current_source,
+            'is_premium': self._current_source in premium_sources,
+            'is_fallback': self._current_source == 'yahoo' and 'alpaca' in self.providers,
+            'display_name': self._get_source_display_name(self._current_source),
+            'badge_color': 'green' if self._current_source in premium_sources else 'amber'
+        }
+    
+    def _get_source_display_name(self, source: str) -> str:
+        """Get display name for a source."""
+        names = {
+            'alpaca': 'Alpaca',
+            'polygon': 'Polygon.io',
+            'yahoo': 'yfinance',
+            'alpha_vantage': 'Alpha Vantage',
+            'cache': 'Cache',
+            'none': 'No Data'
+        }
+        return names.get(source, source)
     
     def add_provider(self, name: str, provider: BaseDataProvider):
         """
@@ -268,7 +310,9 @@ class DataAggregator:
         preferred_provider: str = None
     ) -> Tuple[pd.DataFrame, str]:
         """
-        Fetch historical data with fallback.
+        Fetch historical data with intelligent fallback and source tracking.
+        
+        Prioritizes Alpaca for institutional-grade data, falls back to Yahoo.
         
         Args:
             ticker: Stock symbol
@@ -278,7 +322,8 @@ class DataAggregator:
             preferred_provider: Force specific provider (optional)
         
         Returns:
-            Tuple of (DataFrame, source_name)
+            Tuple of (DataFrame with metadata, source_name)
+            DataFrame includes 'source' attribute for transparency
         """
         self.stats['requests'] += 1
         
@@ -286,13 +331,21 @@ class DataAggregator:
         cache_key = self._get_cache_key(ticker, start, end)
         cached_data = self._read_cache(cache_key)
         if cached_data is not None:
+            self._current_source = 'cache'
+            # Add source metadata to DataFrame
+            cached_data.attrs['source'] = 'cache'
+            cached_data.attrs['is_fallback'] = False
             return cached_data, 'cache'
         
-        # Determine provider order
+        # Determine provider order (Alpaca first)
         if preferred_provider and preferred_provider in self.providers:
             providers_to_try = [preferred_provider] + [p for p in self.provider_order if p != preferred_provider]
         else:
             providers_to_try = self.provider_order
+        
+        # Track if we're using fallback
+        primary_provider = providers_to_try[0] if providers_to_try else 'yahoo'
+        used_fallback = False
         
         # Try each provider
         for provider_name in providers_to_try:
@@ -310,9 +363,25 @@ class DataAggregator:
                 if not data.empty:
                     self._write_cache(cache_key, data)
                     
-                    if provider_name != providers_to_try[0]:
+                    # Track fallback usage
+                    if provider_name != primary_provider:
                         self.stats['fallbacks'] += 1
+                        used_fallback = True
                         self.logger.info(f"Fallback to {provider_name} for {ticker}")
+                    
+                    # Update current source
+                    self._current_source = provider_name
+                    self._source_history.append({
+                        'ticker': ticker,
+                        'source': provider_name,
+                        'timestamp': datetime.now().isoformat(),
+                        'is_fallback': used_fallback
+                    })
+                    
+                    # Add source metadata to DataFrame attrs
+                    data.attrs['source'] = provider_name
+                    data.attrs['is_fallback'] = used_fallback
+                    data.attrs['is_premium'] = provider_name in {'alpaca', 'polygon'}
                     
                     return data, provider_name
                     
@@ -321,6 +390,7 @@ class DataAggregator:
                 continue
         
         self.stats['failures'] += 1
+        self._current_source = 'none'
         self.logger.error(f"All providers failed for {ticker}")
         return pd.DataFrame(), 'none'
     

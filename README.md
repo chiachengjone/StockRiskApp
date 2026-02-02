@@ -9,33 +9,33 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 
 ## What's New in v4.3
 
-### 🔮 Portfolio Digital Twin
+### Portfolio Digital Twin
 - **Scenario Simulation** - Monte Carlo simulation of rebalancing strategies
 - **Strategy Comparison** - Buy-and-hold vs Monthly/Quarterly/Threshold rebalancing
 - **Tax-Loss Harvesting** - Simulate tax-optimized portfolio management
 - **Portfolio Health Score** - Comprehensive 0-100 health assessment with recommendations
 - **Correlation Monitoring** - Real-time alerts when normally uncorrelated assets converge
 
-### 🧠 Behavioral Finance & Sentiment Analysis
+### Behavioral Finance & Sentiment Analysis
 - **NLP Sentiment Scoring** - TextBlob + VADER dual-analyzer with financial lexicon
 - **Sentiment-Adjusted VaR** - VaR adjustment based on market sentiment (0.7x-1.5x multiplier)
 - **News Sentiment Tracking** - Real-time sentiment analysis from financial news
 - **Whale Activity Tracking** - Monitor large institutional transactions
 - **Portfolio Sentiment Heatmap** - Visualize sentiment across holdings
 
-### 🎯 Interactive What-If Analysis
+### Interactive What-If Analysis
 - **Real-time Weight Adjustment** - Interactive sliders with immediate metric updates
 - **Efficient Frontier Overlay** - See your portfolio position relative to optimal frontier
 - **Trade Recommendations** - Automatic rebalancing trade list with cost estimates
 - **Scenario Builder** - Save and compare multiple portfolio scenarios
 
-### ⚡ Enhanced Real-time Data Pipeline
+### Enhanced Real-time Data Pipeline
 - **Polygon.io Integration** - Professional market data with WebSocket streaming
 - **Alpaca Markets Integration** - Real-time quotes with paper/live trading support
 - **WebSocket Price Streaming** - Sub-second price updates during market hours
 - **Multi-Provider Fallback** - Automatic failover between data sources
 
-### 📊 Enhanced Visualizations
+### Enhanced Visualizations
 - **3D Volatility Surfaces** - Interactive rotation, slicing, and ATM term structure
 - **Volatility Smile Cross-Sections** - Time-horizon slices of IV surface
 - **Fan Charts** - Probability distribution over simulation horizon
@@ -330,4 +330,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
-**Built with ❤️ using Python & Streamlit**
+**Built with Python & Streamlit**

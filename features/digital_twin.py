@@ -266,7 +266,7 @@ class DigitalTwinEngine:
         if self.correlation_monitor:
             convergence = self.correlation_monitor.detect_convergence()
             if convergence['n_alerts'] > 0:
-                recommendations.append(f"⚠️ {convergence['n_alerts']} correlation convergence alerts detected")
+                recommendations.append(f"Warning: {convergence['n_alerts']} correlation convergence alerts detected")
         
         # Overall Score (weighted average)
         overall_score = (
@@ -565,11 +565,11 @@ def render_digital_twin_tab(
     initial_capital: float = 100000
 ):
     """Render the Digital Twin dashboard tab."""
-    st.markdown("### 🔮 Portfolio Digital Twin")
+    st.markdown("### Portfolio Digital Twin")
     st.markdown("*Compare your portfolio under different management scenarios*")
     
     # Configuration
-    with st.expander("⚙️ Simulation Configuration", expanded=False):
+    with st.expander("Simulation Configuration", expanded=False):
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -629,7 +629,7 @@ def render_digital_twin_tab(
     
     with col2:
         # Recommendations
-        st.markdown("**📋 Recommendations:**")
+        st.markdown("**Recommendations:**")
         if health.recommendations:
             for rec in health.recommendations:
                 st.info(rec)
@@ -639,9 +639,9 @@ def render_digital_twin_tab(
     st.divider()
     
     # Scenario Comparison
-    st.markdown("### 📊 Scenario Analysis")
+    st.markdown("### Scenario Analysis")
     
-    tab1, tab2, tab3 = st.tabs(["📈 Comparison", "🌊 Fan Chart", "📋 Details"])
+    tab1, tab2, tab3 = st.tabs(["Comparison", "Fan Chart", "Details"])
     
     with tab1:
         st.plotly_chart(
@@ -688,7 +688,7 @@ def render_digital_twin_tab(
     st.divider()
     
     # Correlation Monitoring
-    st.markdown("### 🔗 Correlation Monitoring")
+    st.markdown("### Correlation Monitoring")
     
     if engine.correlation_monitor:
         convergence = engine.correlation_monitor.detect_convergence()
@@ -710,15 +710,15 @@ def render_digital_twin_tab(
         
         # Regime indicator
         if convergence['correlation_regime'] == 'stressed':
-            st.warning("⚠️ Elevated correlation detected - diversification benefits may be reduced")
+            st.warning("Elevated correlation detected - diversification benefits may be reduced")
         else:
-            st.success("✅ Correlation levels are normal")
+            st.success("Correlation levels are normal")
         
         # Alerts
         if convergence['n_alerts'] > 0:
-            st.markdown("**⚠️ Correlation Alerts:**")
+            st.markdown("**Correlation Alerts:**")
             for alert in convergence['alerts'][:5]:
-                severity_emoji = "🔴" if alert['severity'] == 'high' else "🟡"
+                severity_emoji = "HIGH:" if alert['severity'] == 'high' else "MEDIUM:"
                 st.warning(
                     f"{severity_emoji} {alert['asset1']} ↔ {alert['asset2']}: "
                     f"Correlation {alert['alert_type']} from {alert['baseline_correlation']:.2f} "
@@ -726,7 +726,7 @@ def render_digital_twin_tab(
                 )
         
         # Correlation heatmaps
-        with st.expander("📊 Correlation Matrices", expanded=False):
+        with st.expander("Correlation Matrices", expanded=False):
             fig_baseline, fig_recent = create_correlation_heatmap(engine.correlation_monitor)
             
             col1, col2 = st.columns(2)
@@ -747,7 +747,7 @@ def render_quick_scenario_widget(
     weights: Dict[str, float]
 ):
     """Render a compact scenario comparison widget for sidebar."""
-    st.markdown("#### 🔮 Quick Scenario Check")
+    st.markdown("#### Quick Scenario Check")
     
     engine = DigitalTwinEngine(
         returns=returns,

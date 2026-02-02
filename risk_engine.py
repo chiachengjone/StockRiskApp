@@ -16,6 +16,7 @@ from scipy.stats import norm, t, genpareto
 from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression
 from arch import arch_model
+from typing import Dict, List, Any, Optional
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -32,19 +33,223 @@ except ImportError:
     CONFIG_SCENARIOS = None
 
 # ============================================================================
-# STRESS SCENARIOS
+# STRESS SCENARIOS (Extended with Macro Events)
 # ============================================================================
 # Use config if available, otherwise fall back to defaults
 if CONFIG_SCENARIOS:
     STRESS_SCENARIOS = CONFIG_SCENARIOS
 else:
     STRESS_SCENARIOS = {
+        # Historical Crisis Events
         "Black Monday 1987": {"market_shock": -0.20, "vol_multiplier": 3.0, "description": "Oct 19, 1987: -20% single day"},
         "Dot-com Crash 2000": {"market_shock": -0.45, "vol_multiplier": 2.0, "description": "2000-2002: Tech bubble burst"},
         "GFC 2008": {"market_shock": -0.50, "vol_multiplier": 4.0, "description": "2008: Lehman collapse, -50% peak-trough"},
         "COVID Crash 2020": {"market_shock": -0.35, "vol_multiplier": 5.0, "description": "Mar 2020: Fastest 30% drop ever"},
         "Mild Correction": {"market_shock": -0.10, "vol_multiplier": 1.5, "description": "Typical 10% pullback"},
         "Severe Bear": {"market_shock": -0.30, "vol_multiplier": 2.5, "description": "Extended bear market"},
+        
+        # Macro-Driven Scenarios (v4.3 Professional)
+        "Fed +50bps Hike": {
+            "market_shock": -0.08, 
+            "vol_multiplier": 1.8, 
+            "description": "Surprise 50bps rate hike - Growth & Tech most affected",
+            "sector_betas": {
+                "Technology": 1.5,
+                "Consumer Discretionary": 1.3,
+                "Real Estate": 1.4,
+                "Financials": 0.7,  # Banks benefit from higher rates
+                "Utilities": 1.2,
+                "Healthcare": 0.8,
+                "Energy": 0.9,
+                "Consumer Staples": 0.7,
+                "Industrials": 1.0,
+                "Materials": 1.0,
+                "Communication Services": 1.2
+            },
+            "duration_sensitivity": -0.02  # Per year of duration
+        },
+        "Fed +75bps Emergency": {
+            "market_shock": -0.12, 
+            "vol_multiplier": 2.5, 
+            "description": "Emergency 75bps hike - High inflation response",
+            "sector_betas": {
+                "Technology": 1.8,
+                "Consumer Discretionary": 1.5,
+                "Real Estate": 1.6,
+                "Financials": 0.6,
+                "Utilities": 1.3,
+                "Healthcare": 0.7,
+                "Energy": 0.8,
+                "Consumer Staples": 0.6,
+                "Industrials": 1.1,
+                "Materials": 1.0,
+                "Communication Services": 1.4
+            },
+            "duration_sensitivity": -0.03
+        },
+        "Oil Spike +20%": {
+            "market_shock": -0.06, 
+            "vol_multiplier": 1.6, 
+            "description": "Geopolitical oil supply shock +20%",
+            "sector_betas": {
+                "Energy": -0.5,  # Energy sector benefits
+                "Utilities": 1.3,
+                "Industrials": 1.4,
+                "Consumer Discretionary": 1.5,
+                "Transportation": 1.8,  # Airlines, trucking
+                "Technology": 0.8,
+                "Financials": 0.9,
+                "Consumer Staples": 1.1,
+                "Healthcare": 0.7,
+                "Real Estate": 1.0,
+                "Materials": 1.2
+            },
+            "commodity_correlation": 0.7
+        },
+        "Oil Spike +50%": {
+            "market_shock": -0.12, 
+            "vol_multiplier": 2.2, 
+            "description": "Major supply disruption - oil +50%",
+            "sector_betas": {
+                "Energy": -0.8,
+                "Utilities": 1.5,
+                "Industrials": 1.6,
+                "Consumer Discretionary": 1.8,
+                "Transportation": 2.2,
+                "Technology": 0.9,
+                "Financials": 1.0,
+                "Consumer Staples": 1.3,
+                "Healthcare": 0.8,
+                "Real Estate": 1.1,
+                "Materials": 1.4
+            },
+            "commodity_correlation": 0.85
+        },
+        "China Slowdown": {
+            "market_shock": -0.15,
+            "vol_multiplier": 2.0,
+            "description": "Chinese GDP growth drops to 3%",
+            "sector_betas": {
+                "Materials": 1.8,
+                "Industrials": 1.5,
+                "Technology": 1.3,
+                "Consumer Discretionary": 1.4,
+                "Energy": 1.3,
+                "Financials": 1.0,
+                "Healthcare": 0.7,
+                "Consumer Staples": 0.8,
+                "Utilities": 0.6,
+                "Real Estate": 1.0,
+                "Communication Services": 0.9
+            },
+            "em_correlation": 0.8
+        },
+        "Credit Crisis": {
+            "market_shock": -0.25,
+            "vol_multiplier": 3.5,
+            "description": "Corporate credit spreads blow out 300bps",
+            "sector_betas": {
+                "Financials": 1.8,
+                "Real Estate": 1.6,
+                "Consumer Discretionary": 1.4,
+                "Industrials": 1.3,
+                "Technology": 1.1,
+                "Energy": 1.2,
+                "Materials": 1.3,
+                "Healthcare": 0.8,
+                "Consumer Staples": 0.7,
+                "Utilities": 0.9,
+                "Communication Services": 1.0
+            },
+            "credit_sensitivity": -0.05  # Per 100bps spread widening
+        }
+    }
+
+
+# Macro-Beta Stress Test Function
+def macro_stress_test(
+    returns_df: pd.DataFrame,
+    weights: np.ndarray,
+    scenario_name: str,
+    sector_map: Dict[str, str] = None,
+    custom_betas: Dict[str, float] = None
+) -> Dict[str, Any]:
+    """
+    Apply macro-driven stress scenario with sector-specific betas.
+    
+    Args:
+        returns_df: DataFrame of asset returns
+        weights: Portfolio weights array
+        scenario_name: Name of scenario from STRESS_SCENARIOS
+        sector_map: Dict mapping tickers to sectors
+        custom_betas: Override sector betas for specific assets
+    
+    Returns:
+        Dictionary with stressed returns and risk decomposition
+    """
+    if scenario_name not in STRESS_SCENARIOS:
+        return {'error': f'Unknown scenario: {scenario_name}'}
+    
+    scenario = STRESS_SCENARIOS[scenario_name]
+    base_shock = scenario['market_shock']
+    vol_mult = scenario['vol_multiplier']
+    sector_betas = scenario.get('sector_betas', {})
+    
+    tickers = list(returns_df.columns)
+    stressed_returns = {}
+    risk_contributions = {}
+    
+    for i, ticker in enumerate(tickers):
+        # Determine sector beta
+        if custom_betas and ticker in custom_betas:
+            beta = custom_betas[ticker]
+        elif sector_map and ticker in sector_map:
+            sector = sector_map[ticker]
+            beta = sector_betas.get(sector, 1.0)
+        else:
+            beta = 1.0  # Default market beta
+        
+        # Compute idiosyncratic volatility
+        idio_vol = float(returns_df[ticker].std())
+        
+        # Apply shock with beta adjustment
+        stock_shock = base_shock * beta
+        idio_component = idio_vol * vol_mult * np.random.randn() * 0.5
+        
+        stressed_ret = stock_shock + idio_component
+        stressed_returns[ticker] = stressed_ret
+        
+        # Risk contribution
+        risk_contributions[ticker] = {
+            'systematic': stock_shock,
+            'idiosyncratic': idio_component,
+            'total': stressed_ret,
+            'beta_used': beta
+        }
+    
+    # Portfolio stressed return
+    port_stressed = sum(
+        weights[i] * stressed_returns[tickers[i]] 
+        for i in range(len(weights))
+    )
+    
+    # Attribution
+    systematic_component = sum(
+        weights[i] * risk_contributions[tickers[i]]['systematic']
+        for i in range(len(weights))
+    )
+    idio_component = port_stressed - systematic_component
+    
+    return {
+        'scenario': scenario_name,
+        'description': scenario['description'],
+        'portfolio_return': float(port_stressed),
+        'systematic_return': float(systematic_component),
+        'idiosyncratic_return': float(idio_component),
+        'individual': stressed_returns,
+        'risk_contributions': risk_contributions,
+        'base_shock': base_shock,
+        'vol_multiplier': vol_mult
     }
 
 # ============================================================================
