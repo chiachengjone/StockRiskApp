@@ -39,5 +39,11 @@ passlib[bcrypt]==1.7.4
 # CORS
 starlette==0.35.1
 
+# PDF Generation
+fpdf2==2.7.6
+
+# Additional Data Sources
+pandas-datareader==0.10.0
+
 # Background Tasks
 celery[redis]==5.3.6

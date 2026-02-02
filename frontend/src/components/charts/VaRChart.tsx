@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import Chart from 'react-apexcharts'
 import { ApexOptions } from 'apexcharts'
+import { useUIState } from '../../store/portfolioStore'
 
 interface VaRChartProps {
   returns: number[]
@@ -9,6 +10,8 @@ interface VaRChartProps {
 }
 
 export default function VaRChart({ returns, varValue, cvarValue }: VaRChartProps) {
+  const { darkMode } = useUIState()
+  
   // Create histogram bins
   const bins = useMemo(() => {
     if (!returns || returns.length === 0) return { categories: [], counts: [] }
@@ -38,7 +41,11 @@ export default function VaRChart({ returns, varValue, cvarValue }: VaRChartProps
     chart: {
       type: 'bar',
       height: 300,
+      background: 'transparent',
       toolbar: { show: false },
+    },
+    theme: {
+      mode: darkMode ? 'dark' : 'light',
     },
     plotOptions: {
       bar: {
@@ -48,6 +55,9 @@ export default function VaRChart({ returns, varValue, cvarValue }: VaRChartProps
     },
     dataLabels: {
       enabled: false,
+    },
+    grid: {
+      borderColor: darkMode ? '#374151' : '#e5e7eb',
     },
     xaxis: {
       categories: bins.categories,
@@ -60,6 +70,7 @@ export default function VaRChart({ returns, varValue, cvarValue }: VaRChartProps
         maxHeight: 60,
         style: {
           fontSize: '10px',
+          colors: darkMode ? '#9ca3af' : '#6b7280',
         },
       },
       tickAmount: 10,
@@ -67,9 +78,20 @@ export default function VaRChart({ returns, varValue, cvarValue }: VaRChartProps
     yaxis: {
       title: {
         text: 'Frequency',
+        style: {
+          color: darkMode ? '#9ca3af' : '#6b7280',
+        },
+      },
+      labels: {
+        style: {
+          colors: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
     },
-    colors: ['#6366F1'],
+    colors: ['#6366f1'],
+    tooltip: {
+      theme: darkMode ? 'dark' : 'light',
+    },
     annotations: {
       xaxis: [
         {
@@ -104,9 +126,10 @@ export default function VaRChart({ returns, varValue, cvarValue }: VaRChartProps
       style: {
         fontSize: '14px',
         fontWeight: 600,
+        color: darkMode ? '#f3f4f6' : '#111827',
       },
     },
-  }), [bins.categories, varValue, cvarValue])
+  }), [bins.categories, varValue, cvarValue, darkMode])
 
   const series = useMemo(() => [{
     name: 'Count',

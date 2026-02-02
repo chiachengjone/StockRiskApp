@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   ReferenceDot,
 } from 'recharts'
+import { useUIState } from '../../store/portfolioStore'
 
 interface EfficientFrontierChartProps {
   returns: number[]
@@ -23,6 +24,8 @@ export default function EfficientFrontierChart({
   maxSharpePoint,
   minVolPoint,
 }: EfficientFrontierChartProps) {
+  const { darkMode } = useUIState()
+  
   const data = useMemo(() => 
     returns.map((r, i) => ({
       risk: volatilities[i] * 100,
@@ -31,20 +34,25 @@ export default function EfficientFrontierChart({
   [returns, volatilities])
 
   if (!returns || !volatilities || returns.length === 0) {
-    return <div className="text-center text-gray-500 py-8">No data available</div>
+    return <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No data available</div>
   }
+
+  const axisColor = darkMode ? '#9ca3af' : '#6b7280'
+  const gridColor = darkMode ? '#374151' : '#e5e7eb'
 
   return (
     <ResponsiveContainer width="100%" height={400}>
       <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" />
+        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
         <XAxis
           type="number"
           dataKey="risk"
           name="Risk"
           unit="%"
           domain={['dataMin - 1', 'dataMax + 1']}
-          label={{ value: 'Risk (Volatility %)', position: 'bottom', offset: 0 }}
+          label={{ value: 'Risk (Volatility %)', position: 'bottom', offset: 0, fill: axisColor }}
+          tick={{ fill: axisColor }}
+          stroke={gridColor}
         />
         <YAxis
           type="number"
@@ -52,17 +60,24 @@ export default function EfficientFrontierChart({
           name="Return"
           unit="%"
           domain={['dataMin - 1', 'dataMax + 1']}
-          label={{ value: 'Return %', angle: -90, position: 'insideLeft' }}
+          label={{ value: 'Return %', angle: -90, position: 'insideLeft', fill: axisColor }}
+          tick={{ fill: axisColor }}
+          stroke={gridColor}
         />
         <Tooltip
           formatter={(value: number, name: string) => [`${value.toFixed(2)}%`, name]}
           cursor={{ strokeDasharray: '3 3' }}
+          contentStyle={{
+            backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+            borderColor: darkMode ? '#374151' : '#e5e7eb',
+            color: darkMode ? '#f3f4f6' : '#111827',
+          }}
         />
         <Scatter
           name="Efficient Frontier"
           data={data}
-          fill="#3B82F6"
-          line={{ stroke: '#3B82F6', strokeWidth: 2 }}
+          fill="#10b981"
+          line={{ stroke: '#10b981', strokeWidth: 2 }}
         />
         {/* Max Sharpe Point */}
         <ReferenceDot

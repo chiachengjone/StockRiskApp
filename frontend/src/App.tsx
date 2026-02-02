@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import SingleStock from './pages/SingleStock'
 import Portfolio from './pages/Portfolio'
 import TechnicalAnalysis from './pages/TechnicalAnalysis'
+import Reports from './pages/Reports'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="single-stock" element={<SingleStock />} />
         <Route path="portfolio" element={<Portfolio />} />
         <Route path="technical-analysis" element={<TechnicalAnalysis />} />
+        <Route path="reports" element={<Reports />} />
       </Route>
     </Routes>
   )

@@ -1,27 +1,40 @@
+import { useUIState } from '../../store/portfolioStore'
+import clsx from 'clsx'
+
 interface CorrelationHeatmapProps {
   matrix: number[][]
   labels: string[]
 }
 
 export default function CorrelationHeatmap({ matrix, labels }: CorrelationHeatmapProps) {
+  const { darkMode } = useUIState()
+  
   const getColor = (value: number) => {
     // Value ranges from -1 to 1
-    // -1: dark red, 0: white, 1: dark blue
+    // -1: red, 0: neutral, 1: emerald
     if (value >= 0) {
       const intensity = Math.round(value * 255)
-      return `rgb(${255 - intensity}, ${255 - intensity}, 255)`
+      if (darkMode) {
+        // Dark mode: blend with darker background
+        return `rgb(${16 + (1 - value) * 30}, ${185 * value + 60}, ${129 * value + 60})`
+      }
+      return `rgb(${255 - intensity}, ${255 - intensity * 0.3}, ${255 - intensity * 0.5})`
     } else {
-      const intensity = Math.round(Math.abs(value) * 255)
-      return `rgb(255, ${255 - intensity}, ${255 - intensity})`
+      const intensity = Math.abs(value)
+      if (darkMode) {
+        return `rgb(${239 * intensity + 60}, ${68 * intensity + 60}, ${68 * intensity + 60})`
+      }
+      const i = Math.round(intensity * 255)
+      return `rgb(255, ${255 - i}, ${255 - i})`
     }
   }
 
   const getTextColor = (value: number) => {
-    return Math.abs(value) > 0.5 ? 'white' : 'black'
+    return Math.abs(value) > 0.4 ? 'white' : (darkMode ? '#d1d5db' : '#374151')
   }
 
   if (!matrix || !labels || matrix.length === 0) {
-    return <div className="text-center text-gray-500 py-8">No data available</div>
+    return <div className={clsx('text-center py-8', darkMode ? 'text-gray-400' : 'text-gray-500')}>No data available</div>
   }
 
   return (
@@ -33,7 +46,10 @@ export default function CorrelationHeatmap({ matrix, labels }: CorrelationHeatma
             {labels.map((label) => (
               <th
                 key={label}
-                className="px-3 py-2 text-xs font-medium text-gray-600 text-center"
+                className={clsx(
+                  'px-3 py-2 text-xs font-medium text-center',
+                  darkMode ? 'text-gray-300' : 'text-gray-600'
+                )}
               >
                 {label}
               </th>
@@ -43,7 +59,10 @@ export default function CorrelationHeatmap({ matrix, labels }: CorrelationHeatma
         <tbody>
           {matrix.map((row, i) => (
             <tr key={labels[i]}>
-              <td className="px-3 py-2 text-xs font-medium text-gray-600 text-right">
+              <td className={clsx(
+                'px-3 py-2 text-xs font-medium text-right',
+                darkMode ? 'text-gray-300' : 'text-gray-600'
+              )}>
                 {labels[i]}
               </td>
               {row.map((value, j) => (
@@ -65,8 +84,8 @@ export default function CorrelationHeatmap({ matrix, labels }: CorrelationHeatma
       
       {/* Legend */}
       <div className="flex items-center justify-center mt-4 gap-2">
-        <span className="text-xs text-gray-500">-1 (Negative)</span>
-        <div className="flex h-4">
+        <span className={clsx('text-xs', darkMode ? 'text-gray-400' : 'text-gray-500')}>-1 (Negative)</span>
+        <div className="flex h-4 rounded overflow-hidden">
           {[...Array(11)].map((_, i) => {
             const value = (i - 5) / 5 // -1 to 1
             return (
@@ -78,7 +97,7 @@ export default function CorrelationHeatmap({ matrix, labels }: CorrelationHeatma
             )
           })}
         </div>
-        <span className="text-xs text-gray-500">+1 (Positive)</span>
+        <span className={clsx('text-xs', darkMode ? 'text-gray-400' : 'text-gray-500')}>+1 (Positive)</span>
       </div>
     </div>
   )

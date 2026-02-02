@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import Chart from 'react-apexcharts'
 import { ApexOptions } from 'apexcharts'
+import { useUIState } from '../../store/portfolioStore'
 
 interface CandlestickChartProps {
   dates: string[]
@@ -23,6 +24,8 @@ export default function CandlestickChart({
   bollingerMiddle,
   bollingerLower,
 }: CandlestickChartProps) {
+  const { darkMode } = useUIState()
+  
   const candlestickData = useMemo(() => 
     dates.map((date, i) => ({
       x: new Date(date).getTime(),
@@ -75,6 +78,7 @@ export default function CandlestickChart({
     chart: {
       type: 'candlestick',
       height: 400,
+      background: 'transparent',
       toolbar: {
         show: true,
         tools: {
@@ -88,6 +92,12 @@ export default function CandlestickChart({
         },
       },
     },
+    theme: {
+      mode: darkMode ? 'dark' : 'light',
+    },
+    grid: {
+      borderColor: darkMode ? '#374151' : '#e5e7eb',
+    },
     xaxis: {
       type: 'datetime',
       labels: {
@@ -95,6 +105,9 @@ export default function CandlestickChart({
           year: 'yyyy',
           month: "MMM 'yy",
           day: 'dd MMM',
+        },
+        style: {
+          colors: darkMode ? '#9ca3af' : '#6b7280',
         },
       },
     },
@@ -104,6 +117,9 @@ export default function CandlestickChart({
       },
       labels: {
         formatter: (val) => `$${val.toFixed(2)}`,
+        style: {
+          colors: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
     },
     plotOptions: {
@@ -118,18 +134,22 @@ export default function CandlestickChart({
       width: [1, 1, 1, 1],
       curve: 'smooth',
     },
-    colors: ['#000', '#8B5CF6', '#3B82F6', '#8B5CF6'],
+    colors: [darkMode ? '#6b7280' : '#374151', '#10b981', '#3B82F6', '#10b981'],
     legend: {
       show: true,
       position: 'top',
+      labels: {
+        colors: darkMode ? '#d1d5db' : '#374151',
+      },
     },
     tooltip: {
       shared: true,
+      theme: darkMode ? 'dark' : 'light',
     },
-  }), [])
+  }), [darkMode])
 
   if (!dates || dates.length === 0) {
-    return <div className="text-center text-gray-500 py-8">No data available</div>
+    return <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No data available</div>
   }
 
   return (

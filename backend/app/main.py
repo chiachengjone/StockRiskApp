@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
-from app.api import risk, ml, portfolio, data, ta
+from app.api import risk, ml, portfolio, data, ta, factors, options, fundamentals, sentiment, digital_twin, reports
 from app.core.config import settings
 
 # Configure logging
@@ -40,6 +40,11 @@ app = FastAPI(
     * **Machine Learning**: XGBoost/GradientBoosting VaR prediction
     * **Portfolio Optimization**: Risk Parity, HRP, Black-Litterman
     * **Technical Analysis**: SMA, EMA, RSI, MACD, Bollinger Bands
+    * **Factor Analysis**: Fama-French, Kelly Criterion, ESG, Style Factors
+    * **Options Analytics**: Black-Scholes, Greeks, Implied Volatility
+    * **Fundamentals**: DCF Valuation, Peer Comparison, Quality Scoring
+    * **Sentiment Analysis**: Momentum-based sentiment, Sentiment-adjusted VaR
+    * **Digital Twin**: Portfolio simulation, What-If analysis
     * **Data Aggregation**: Multi-provider with fallback
     """,
     version="1.0.0",
@@ -61,6 +66,12 @@ app.include_router(ml.router, prefix="/api/ml", tags=["Machine Learning"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
 app.include_router(data.router, prefix="/api/data", tags=["Data"])
 app.include_router(ta.router, prefix="/api/ta", tags=["Technical Analysis"])
+app.include_router(factors.router, prefix="/api/factors", tags=["Factor Analysis"])
+app.include_router(options.router, prefix="/api/options", tags=["Options Analytics"])
+app.include_router(fundamentals.router, prefix="/api/fundamentals", tags=["Fundamentals"])
+app.include_router(sentiment.router, prefix="/api/sentiment", tags=["Sentiment Analysis"])
+app.include_router(digital_twin.router, prefix="/api/digital-twin", tags=["Digital Twin"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 
 @app.get("/")

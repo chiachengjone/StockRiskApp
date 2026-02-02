@@ -1,16 +1,19 @@
 import { useMemo } from 'react'
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { useUIState } from '../../store/portfolioStore'
 
 interface PieChartProps {
   data: Array<{ name: string; value: number }>
 }
 
 const COLORS = [
-  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+  '#10b981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EF4444',
   '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1',
 ]
 
 export default function PieChart({ data }: PieChartProps) {
+  const { darkMode } = useUIState()
+  
   const formattedData = useMemo(() => 
     data.filter((d) => d.value > 0.1).map((d, i) => ({
       ...d,
@@ -19,7 +22,7 @@ export default function PieChart({ data }: PieChartProps) {
   [data])
 
   if (!data || data.length === 0) {
-    return <div className="text-center text-gray-500 py-8">No data available</div>
+    return <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No data available</div>
   }
 
   return (
@@ -41,8 +44,17 @@ export default function PieChart({ data }: PieChartProps) {
         </Pie>
         <Tooltip 
           formatter={(value: number) => `${value.toFixed(2)}%`}
+          contentStyle={{
+            backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+            borderColor: darkMode ? '#374151' : '#e5e7eb',
+            color: darkMode ? '#f3f4f6' : '#111827',
+          }}
         />
-        <Legend />
+        <Legend 
+          wrapperStyle={{
+            color: darkMode ? '#d1d5db' : '#374151',
+          }}
+        />
       </RechartsPie>
     </ResponsiveContainer>
   )

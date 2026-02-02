@@ -1,12 +1,15 @@
 import { useMemo } from 'react'
 import Chart from 'react-apexcharts'
 import { ApexOptions } from 'apexcharts'
+import { useUIState } from '../../store/portfolioStore'
 
 interface MonteCarloChartProps {
   percentiles: Record<string, number>
 }
 
 export default function MonteCarloChart({ percentiles }: MonteCarloChartProps) {
+  const { darkMode } = useUIState()
+  
   const data = useMemo(() => {
     if (!percentiles) return []
     
@@ -23,6 +26,10 @@ export default function MonteCarloChart({ percentiles }: MonteCarloChartProps) {
       type: 'area',
       height: 300,
       toolbar: { show: false },
+      background: 'transparent',
+    },
+    theme: {
+      mode: darkMode ? 'dark' : 'light',
     },
     dataLabels: {
       enabled: false,
@@ -40,24 +47,42 @@ export default function MonteCarloChart({ percentiles }: MonteCarloChartProps) {
         stops: [0, 100],
       },
     },
+    grid: {
+      borderColor: darkMode ? '#374151' : '#e5e7eb',
+    },
     xaxis: {
       type: 'numeric',
       title: {
         text: 'Percentile',
+        style: {
+          color: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
       labels: {
         formatter: (val) => `${val}%`,
+        style: {
+          colors: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
     },
     yaxis: {
       title: {
         text: 'Return (%)',
+        style: {
+          color: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
       labels: {
         formatter: (val) => `${val.toFixed(1)}%`,
+        style: {
+          colors: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
     },
-    colors: ['#8B5CF6'],
+    tooltip: {
+      theme: darkMode ? 'dark' : 'light',
+    },
+    colors: ['#10b981'],
     annotations: {
       yaxis: [
         {
@@ -108,9 +133,10 @@ export default function MonteCarloChart({ percentiles }: MonteCarloChartProps) {
       style: {
         fontSize: '14px',
         fontWeight: 600,
+        color: darkMode ? '#f3f4f6' : '#111827',
       },
     },
-  }), [data])
+  }), [data, darkMode])
 
   const series = useMemo(() => [{
     name: 'Return',

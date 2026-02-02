@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import Chart from 'react-apexcharts'
 import { ApexOptions } from 'apexcharts'
+import { useUIState } from '../../store/portfolioStore'
 
 interface PriceChartProps {
   dates: string[]
@@ -9,10 +10,13 @@ interface PriceChartProps {
 }
 
 export default function PriceChart({ dates, prices, ticker }: PriceChartProps) {
+  const { darkMode } = useUIState()
+  
   const options: ApexOptions = useMemo(() => ({
     chart: {
       type: 'area',
       height: 350,
+      background: 'transparent',
       toolbar: {
         show: true,
         tools: {
@@ -31,6 +35,9 @@ export default function PriceChart({ dates, prices, ticker }: PriceChartProps) {
         speed: 500,
       },
     },
+    theme: {
+      mode: darkMode ? 'dark' : 'light',
+    },
     dataLabels: {
       enabled: false,
     },
@@ -47,6 +54,10 @@ export default function PriceChart({ dates, prices, ticker }: PriceChartProps) {
         stops: [0, 90, 100],
       },
     },
+    grid: {
+      borderColor: darkMode ? '#374151' : '#e5e7eb',
+      strokeDashArray: 4,
+    },
     xaxis: {
       type: 'datetime',
       categories: dates,
@@ -56,17 +67,33 @@ export default function PriceChart({ dates, prices, ticker }: PriceChartProps) {
           month: "MMM 'yy",
           day: 'dd MMM',
         },
+        style: {
+          colors: darkMode ? '#9ca3af' : '#6b7280',
+        },
+      },
+      axisBorder: {
+        color: darkMode ? '#374151' : '#e5e7eb',
+      },
+      axisTicks: {
+        color: darkMode ? '#374151' : '#e5e7eb',
       },
     },
     yaxis: {
       title: {
         text: 'Price ($)',
+        style: {
+          color: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
       labels: {
         formatter: (val) => `$${val.toFixed(2)}`,
+        style: {
+          colors: darkMode ? '#9ca3af' : '#6b7280',
+        },
       },
     },
     tooltip: {
+      theme: darkMode ? 'dark' : 'light',
       x: {
         format: 'MMM dd, yyyy',
       },
@@ -74,16 +101,17 @@ export default function PriceChart({ dates, prices, ticker }: PriceChartProps) {
         formatter: (val) => `$${val.toFixed(2)}`,
       },
     },
-    colors: ['#3B82F6'],
+    colors: ['#10b981'],
     title: {
       text: `${ticker} Price History`,
       align: 'left',
       style: {
         fontSize: '14px',
         fontWeight: 600,
+        color: darkMode ? '#f3f4f6' : '#111827',
       },
     },
-  }), [dates, ticker])
+  }), [dates, ticker, darkMode])
 
   const series = useMemo(() => [{
     name: 'Price',

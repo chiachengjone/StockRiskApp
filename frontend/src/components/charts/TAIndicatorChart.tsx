@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import Chart from 'react-apexcharts'
 import { ApexOptions } from 'apexcharts'
+import { useUIState } from '../../store/portfolioStore'
 
 interface TAIndicatorChartProps {
   dates: string[]
@@ -27,6 +28,8 @@ export default function TAIndicatorChart({
   oversold,
   histogram,
 }: TAIndicatorChartProps) {
+  const { darkMode } = useUIState()
+  
   const series: ApexAxisChartSeries = useMemo(() => {
     const result: ApexAxisChartSeries = [
       {
@@ -97,19 +100,29 @@ export default function TAIndicatorChart({
         type: 'line',
         height: 200,
         toolbar: { show: false },
+        background: 'transparent',
         animations: {
           enabled: false,
         },
       },
+      theme: {
+        mode: darkMode ? 'dark' : 'light',
+      },
       stroke: {
         width: histogram ? [2, 2, 0] : [2, 2],
         curve: 'smooth',
+      },
+      grid: {
+        borderColor: darkMode ? '#374151' : '#e5e7eb',
       },
       xaxis: {
         type: 'datetime',
         categories: dates,
         labels: {
           show: false,
+          style: {
+            colors: darkMode ? '#9ca3af' : '#6b7280',
+          },
         },
         axisTicks: {
           show: false,
@@ -118,7 +131,13 @@ export default function TAIndicatorChart({
       yaxis: {
         labels: {
           formatter: (val) => val?.toFixed(1) || '',
+          style: {
+            colors: darkMode ? '#9ca3af' : '#6b7280',
+          },
         },
+      },
+      tooltip: {
+        theme: darkMode ? 'dark' : 'light',
       },
       colors: histogram 
         ? [color, color2 || '#6B7280', '#9CA3AF'] 
@@ -127,6 +146,9 @@ export default function TAIndicatorChart({
       legend: {
         show: true,
         position: 'top',
+        labels: {
+          colors: darkMode ? '#d1d5db' : '#374151',
+        },
       },
       plotOptions: {
         bar: {
@@ -147,10 +169,10 @@ export default function TAIndicatorChart({
         },
       },
     }
-  }, [dates, color, color2, overbought, oversold, histogram])
+  }, [dates, color, color2, overbought, oversold, histogram, darkMode])
 
   if (!dates || !values || values.length === 0) {
-    return <div className="text-center text-gray-500 py-4">No data available</div>
+    return <div className={`text-center py-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No data available</div>
   }
 
   return (
