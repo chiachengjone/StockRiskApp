@@ -941,3 +941,535 @@ def portfolio_risk_decomposition(
         'marginal_contributions': dict(zip(returns.columns, marginal_contrib)),
         'concentration': float(np.sum(pct_contrib ** 2))  # HHI-style
     }
+
+
+# =============================================================================
+# PORTFOLIO SIMULATION ENGINE
+# =============================================================================
+
+@dataclass
+class SimulationConfig:
+    """Configuration for portfolio simulation."""
+    initial_capital: float = 100000
+    n_simulations: int = 1000
+    horizon_days: int = 252
+    rebalance_frequency: str = 'monthly'  # 'daily', 'weekly', 'monthly', 'quarterly', 'none'
+    rebalance_threshold: float = 0.05  # 5% drift threshold
+    transaction_cost_bps: float = 10  # 10 basis points
+    tax_rate_short: float = 0.35  # Short-term capital gains
+    tax_rate_long: float = 0.15  # Long-term capital gains
+    enable_tax_loss_harvesting: bool = True
+    tax_loss_threshold: float = -0.10  # 10% loss threshold
+    dividend_yield: float = 0.02  # 2% annual dividend yield
+    inflation_rate: float = 0.025  # 2.5% annual inflation
+
+
+class PortfolioSimulator:
+    """
+    Monte Carlo simulation engine for portfolio analysis.
+    
+    Simulates:
+    - Dynamic rebalancing strategies
+    - Tax-loss harvesting
+    - Transaction cost decay
+    - Dividend reinvestment
+    - Inflation-adjusted returns
+    
+    Usage:
+        simulator = PortfolioSimulator(returns_df, weights, config)
+        results = simulator.run_simulation()
+    """
+    
+    def __init__(
+        self,
+        returns: pd.DataFrame,
+        weights: Dict[str, float],
+        config: SimulationConfig = None
+    ):
+        self.returns = returns
+        self.weights = weights
+        self.assets = list(returns.columns)
+        self.n_assets = len(self.assets)
+        self.config = config or SimulationConfig()
+        
+        # Calculate return statistics
+        self.mean_returns = returns.mean().values
+        self.cov_matrix = returns.cov().values
+        self.cholesky = np.linalg.cholesky(self.cov_matrix)
+        
+        # Initialize weight array
+        self.weight_array = np.array([weights.get(a, 0) for a in self.assets])
+    
+    def _generate_returns(self, n_days: int, n_sims: int) -> np.ndarray:
+        """Generate correlated random returns using Cholesky decomposition."""
+        # Generate uncorrelated random returns
+        z = np.random.standard_normal((n_sims, n_days, self.n_assets))
+        
+        # Apply Cholesky to induce correlation
+        correlated_z = np.zeros_like(z)
+        for i in range(n_sims):
+            for j in range(n_days):
+                correlated_z[i, j] = self.cholesky @ z[i, j]
+        
+        # Scale to actual return distribution
+        returns = self.mean_returns + correlated_z * np.sqrt(np.diag(self.cov_matrix))
+        
+        return returns
+    
+    def _rebalance_weights(
+        self,
+        current_weights: np.ndarray,
+        target_weights: np.ndarray,
+        portfolio_value: float
+    ) -> Tuple[np.ndarray, float]:
+        """
+        Rebalance portfolio and calculate transaction costs.
+        
+        Returns:
+            Tuple of (new_weights, transaction_cost)
+        """
+        # Calculate turnover
+        turnover = np.sum(np.abs(current_weights - target_weights))
+        
+        # Transaction cost (proportional to turnover)
+        cost = portfolio_value * turnover * (self.config.transaction_cost_bps / 10000)
+        
+        return target_weights.copy(), cost
+    
+    def _apply_tax_loss_harvesting(
+        self,
+        positions: np.ndarray,
+        cost_basis: np.ndarray,
+        current_prices: np.ndarray,
+        days_held: np.ndarray
+    ) -> Tuple[float, np.ndarray]:
+        """
+        Simulate tax-loss harvesting.
+        
+        Returns:
+            Tuple of (tax_benefit, updated_cost_basis)
+        """
+        if not self.config.enable_tax_loss_harvesting:
+            return 0.0, cost_basis
+        
+        # Calculate unrealized gains/losses
+        gains = (current_prices - cost_basis) / cost_basis
+        
+        # Find positions with losses exceeding threshold
+        harvest_mask = gains < self.config.tax_loss_threshold
+        
+        tax_benefit = 0.0
+        new_cost_basis = cost_basis.copy()
+        
+        for i in range(len(positions)):
+            if harvest_mask[i] and positions[i] > 0:
+                loss = positions[i] * (cost_basis[i] - current_prices[i])
+                
+                # Apply appropriate tax rate
+                if days_held[i] > 365:
+                    tax_rate = self.config.tax_rate_long
+                else:
+                    tax_rate = self.config.tax_rate_short
+                
+                tax_benefit += loss * tax_rate
+                
+                # Reset cost basis (simulate selling and rebuying)
+                new_cost_basis[i] = current_prices[i]
+        
+        return tax_benefit, new_cost_basis
+    
+    def _get_rebalance_days(self, n_days: int) -> List[int]:
+        """Get days when rebalancing should occur."""
+        if self.config.rebalance_frequency == 'none':
+            return []
+        elif self.config.rebalance_frequency == 'daily':
+            return list(range(1, n_days))
+        elif self.config.rebalance_frequency == 'weekly':
+            return list(range(5, n_days, 5))
+        elif self.config.rebalance_frequency == 'monthly':
+            return list(range(21, n_days, 21))
+        elif self.config.rebalance_frequency == 'quarterly':
+            return list(range(63, n_days, 63))
+        else:
+            return list(range(21, n_days, 21))  # Default to monthly
+    
+    def run_simulation(self) -> Dict:
+        """
+        Run full Monte Carlo simulation.
+        
+        Returns:
+            Dictionary with simulation results
+        """
+        n_sims = self.config.n_simulations
+        n_days = self.config.horizon_days
+        initial_capital = self.config.initial_capital
+        
+        # Generate random returns
+        sim_returns = self._generate_returns(n_days, n_sims)
+        
+        # Initialize tracking arrays
+        portfolio_values = np.zeros((n_sims, n_days + 1))
+        portfolio_values[:, 0] = initial_capital
+        
+        # Track costs and taxes
+        total_tx_costs = np.zeros(n_sims)
+        total_tax_benefits = np.zeros(n_sims)
+        total_dividends = np.zeros(n_sims)
+        
+        # Rebalance days
+        rebalance_days = set(self._get_rebalance_days(n_days))
+        
+        # Daily dividend rate
+        daily_div_rate = self.config.dividend_yield / 252
+        
+        # Run simulations
+        for sim in range(n_sims):
+            current_weights = self.weight_array.copy()
+            current_value = initial_capital
+            cost_basis = np.ones(self.n_assets) * 100  # Arbitrary starting price
+            days_held = np.zeros(self.n_assets)
+            
+            for day in range(n_days):
+                # Apply daily returns
+                daily_ret = sim_returns[sim, day]
+                
+                # Update weights based on returns
+                new_weights = current_weights * (1 + daily_ret)
+                new_weights = new_weights / np.sum(new_weights)
+                
+                # Update portfolio value
+                portfolio_return = np.sum(current_weights * daily_ret)
+                current_value = current_value * (1 + portfolio_return)
+                
+                # Add dividends
+                dividend = current_value * daily_div_rate
+                current_value += dividend
+                total_dividends[sim] += dividend
+                
+                # Increment days held
+                days_held += 1
+                
+                # Check for threshold-based rebalancing
+                needs_rebalance = False
+                if day + 1 in rebalance_days:
+                    drift = np.max(np.abs(new_weights - self.weight_array))
+                    if drift > self.config.rebalance_threshold:
+                        needs_rebalance = True
+                
+                # Rebalance if needed
+                if needs_rebalance:
+                    new_weights, tx_cost = self._rebalance_weights(
+                        new_weights, self.weight_array, current_value
+                    )
+                    current_value -= tx_cost
+                    total_tx_costs[sim] += tx_cost
+                    
+                    # Tax-loss harvesting opportunity
+                    current_prices = cost_basis * (1 + daily_ret)
+                    tax_benefit, cost_basis = self._apply_tax_loss_harvesting(
+                        new_weights * current_value / current_prices,
+                        cost_basis,
+                        current_prices,
+                        days_held
+                    )
+                    total_tax_benefits[sim] += tax_benefit
+                    days_held = np.zeros(self.n_assets)  # Reset for harvested positions
+                
+                current_weights = new_weights
+                portfolio_values[sim, day + 1] = current_value
+        
+        # Calculate results
+        final_values = portfolio_values[:, -1]
+        total_returns = (final_values - initial_capital) / initial_capital
+        
+        # Inflation adjustment
+        inflation_factor = (1 + self.config.inflation_rate) ** (n_days / 252)
+        real_returns = total_returns - (inflation_factor - 1)
+        
+        # Statistics
+        return {
+            'mean_return': float(np.mean(total_returns)),
+            'median_return': float(np.median(total_returns)),
+            'std_return': float(np.std(total_returns)),
+            'mean_real_return': float(np.mean(real_returns)),
+            'var_95': float(np.percentile(total_returns, 5)),
+            'cvar_95': float(np.mean(total_returns[total_returns <= np.percentile(total_returns, 5)])),
+            'max_return': float(np.max(total_returns)),
+            'min_return': float(np.min(total_returns)),
+            'sharpe_ratio': float(np.mean(total_returns) / np.std(total_returns)) if np.std(total_returns) > 0 else 0,
+            'prob_loss': float(np.mean(total_returns < 0)),
+            'prob_gain_10': float(np.mean(total_returns > 0.10)),
+            'mean_tx_costs': float(np.mean(total_tx_costs)),
+            'mean_tax_benefits': float(np.mean(total_tax_benefits)),
+            'mean_dividends': float(np.mean(total_dividends)),
+            'net_costs': float(np.mean(total_tx_costs) - np.mean(total_tax_benefits)),
+            'portfolio_values': portfolio_values,
+            'final_values': final_values,
+            'percentiles': {
+                '5': float(np.percentile(final_values, 5)),
+                '25': float(np.percentile(final_values, 25)),
+                '50': float(np.percentile(final_values, 50)),
+                '75': float(np.percentile(final_values, 75)),
+                '95': float(np.percentile(final_values, 95))
+            }
+        }
+    
+    def compare_strategies(self) -> Dict:
+        """
+        Compare different rebalancing strategies.
+        
+        Returns:
+            Comparison of rebalancing strategies
+        """
+        strategies = {
+            'no_rebalance': 'none',
+            'daily': 'daily',
+            'weekly': 'weekly',
+            'monthly': 'monthly',
+            'quarterly': 'quarterly'
+        }
+        
+        results = {}
+        original_freq = self.config.rebalance_frequency
+        
+        for name, freq in strategies.items():
+            self.config.rebalance_frequency = freq
+            sim_result = self.run_simulation()
+            
+            results[name] = {
+                'mean_return': sim_result['mean_return'],
+                'std_return': sim_result['std_return'],
+                'sharpe_ratio': sim_result['sharpe_ratio'],
+                'var_95': sim_result['var_95'],
+                'mean_tx_costs': sim_result['mean_tx_costs'],
+                'net_return': sim_result['mean_return'] - sim_result['mean_tx_costs'] / self.config.initial_capital
+            }
+        
+        self.config.rebalance_frequency = original_freq
+        return results
+
+
+class DynamicRebalancer:
+    """
+    Dynamic rebalancing engine with multiple strategies.
+    
+    Strategies:
+    - Calendar-based (fixed schedule)
+    - Threshold-based (drift triggers)
+    - Volatility-adjusted (rebalance more in high vol)
+    - Momentum-aware (let winners run)
+    """
+    
+    def __init__(
+        self,
+        target_weights: Dict[str, float],
+        returns: pd.DataFrame,
+        cost_model: TransactionCostModel = None
+    ):
+        self.target_weights = target_weights
+        self.returns = returns
+        self.cost_model = cost_model or TransactionCostModel()
+        self.assets = list(target_weights.keys())
+    
+    def calendar_rebalance(
+        self,
+        current_weights: Dict[str, float],
+        frequency: str = 'monthly'
+    ) -> Dict:
+        """Calendar-based rebalancing."""
+        return {
+            'rebalance': True,
+            'new_weights': self.target_weights.copy(),
+            'strategy': 'calendar',
+            'frequency': frequency
+        }
+    
+    def threshold_rebalance(
+        self,
+        current_weights: Dict[str, float],
+        threshold: float = 0.05
+    ) -> Dict:
+        """Threshold-based rebalancing."""
+        max_drift = max(
+            abs(current_weights.get(a, 0) - self.target_weights.get(a, 0))
+            for a in self.assets
+        )
+        
+        if max_drift > threshold:
+            return {
+                'rebalance': True,
+                'new_weights': self.target_weights.copy(),
+                'strategy': 'threshold',
+                'max_drift': max_drift
+            }
+        else:
+            return {
+                'rebalance': False,
+                'new_weights': current_weights,
+                'strategy': 'threshold',
+                'max_drift': max_drift
+            }
+    
+    def volatility_adjusted_rebalance(
+        self,
+        current_weights: Dict[str, float],
+        lookback: int = 20
+    ) -> Dict:
+        """Volatility-adjusted rebalancing."""
+        # Calculate recent volatility
+        recent_vol = self.returns.tail(lookback).std().mean() * np.sqrt(252)
+        historical_vol = self.returns.std().mean() * np.sqrt(252)
+        
+        vol_ratio = recent_vol / historical_vol if historical_vol > 0 else 1.0
+        
+        # More frequent rebalancing in high volatility
+        threshold = 0.05 / vol_ratio  # Lower threshold = more rebalancing
+        
+        return self.threshold_rebalance(current_weights, min(0.10, threshold))
+    
+    def momentum_aware_rebalance(
+        self,
+        current_weights: Dict[str, float],
+        momentum_lookback: int = 60,
+        momentum_threshold: float = 0.05
+    ) -> Dict:
+        """Momentum-aware rebalancing (let winners run)."""
+        # Calculate momentum
+        momentum = self.returns.tail(momentum_lookback).sum()
+        
+        # Adjust target weights based on momentum
+        adjusted_weights = {}
+        total_adj = 0
+        
+        for asset in self.assets:
+            base_weight = self.target_weights.get(asset, 0)
+            asset_momentum = momentum.get(asset, 0)
+            
+            if asset_momentum > momentum_threshold:
+                # Let winners run - reduce rebalancing pressure
+                adj_factor = 1.1
+            elif asset_momentum < -momentum_threshold:
+                # Cut losers faster
+                adj_factor = 0.9
+            else:
+                adj_factor = 1.0
+            
+            adjusted_weights[asset] = base_weight * adj_factor
+            total_adj += adjusted_weights[asset]
+        
+        # Normalize
+        for asset in adjusted_weights:
+            adjusted_weights[asset] /= total_adj
+        
+        return {
+            'rebalance': True,
+            'new_weights': adjusted_weights,
+            'strategy': 'momentum_aware',
+            'momentum': dict(momentum)
+        }
+
+
+# =============================================================================
+# CORRELATION CONVERGENCE ALERTS
+# =============================================================================
+
+class CorrelationMonitor:
+    """
+    Monitor correlation changes between assets.
+    
+    Alerts when normally uncorrelated assets begin moving together,
+    which often signals market stress.
+    """
+    
+    def __init__(
+        self,
+        returns: pd.DataFrame,
+        baseline_window: int = 252,
+        alert_window: int = 21,
+        alert_threshold: float = 0.3
+    ):
+        self.returns = returns
+        self.baseline_window = baseline_window
+        self.alert_window = alert_window
+        self.alert_threshold = alert_threshold
+        self.assets = list(returns.columns)
+    
+    def calculate_baseline_correlation(self) -> pd.DataFrame:
+        """Calculate baseline correlation matrix."""
+        if len(self.returns) < self.baseline_window:
+            return self.returns.corr()
+        return self.returns.tail(self.baseline_window).corr()
+    
+    def calculate_recent_correlation(self) -> pd.DataFrame:
+        """Calculate recent correlation matrix."""
+        return self.returns.tail(self.alert_window).corr()
+    
+    def detect_convergence(self) -> Dict:
+        """
+        Detect correlation convergence/divergence.
+        
+        Returns:
+            Dictionary with alerts and details
+        """
+        baseline = self.calculate_baseline_correlation()
+        recent = self.calculate_recent_correlation()
+        
+        # Calculate correlation changes
+        change = recent - baseline
+        
+        alerts = []
+        
+        for i, asset1 in enumerate(self.assets):
+            for j, asset2 in enumerate(self.assets):
+                if i >= j:
+                    continue
+                
+                baseline_corr = baseline.loc[asset1, asset2]
+                recent_corr = recent.loc[asset1, asset2]
+                corr_change = change.loc[asset1, asset2]
+                
+                # Alert if correlation increased significantly
+                if abs(corr_change) > self.alert_threshold:
+                    alert_type = 'convergence' if corr_change > 0 else 'divergence'
+                    
+                    alerts.append({
+                        'asset1': asset1,
+                        'asset2': asset2,
+                        'baseline_correlation': float(baseline_corr),
+                        'recent_correlation': float(recent_corr),
+                        'change': float(corr_change),
+                        'alert_type': alert_type,
+                        'severity': 'high' if abs(corr_change) > 0.5 else 'medium'
+                    })
+        
+        # Calculate average correlation (market stress indicator)
+        baseline_avg = baseline.values[np.triu_indices_from(baseline.values, 1)].mean()
+        recent_avg = recent.values[np.triu_indices_from(recent.values, 1)].mean()
+        
+        return {
+            'alerts': alerts,
+            'n_alerts': len(alerts),
+            'baseline_avg_correlation': float(baseline_avg),
+            'recent_avg_correlation': float(recent_avg),
+            'correlation_regime': 'stressed' if recent_avg > baseline_avg + 0.2 else 'normal',
+            'baseline_matrix': baseline,
+            'recent_matrix': recent,
+            'change_matrix': change
+        }
+    
+    def get_rolling_average_correlation(
+        self,
+        window: int = 21
+    ) -> pd.Series:
+        """Calculate rolling average pairwise correlation."""
+        rolling_corr = []
+        dates = []
+        
+        for i in range(window, len(self.returns)):
+            subset = self.returns.iloc[i-window:i]
+            corr = subset.corr()
+            avg_corr = corr.values[np.triu_indices_from(corr.values, 1)].mean()
+            rolling_corr.append(avg_corr)
+            dates.append(self.returns.index[i])
+        
+        return pd.Series(rolling_corr, index=dates, name='avg_correlation')

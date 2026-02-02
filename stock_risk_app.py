@@ -40,6 +40,37 @@ try:
 except ImportError:
     HAS_FEATURES = False
 
+# Import new v4.2 features (sentiment, digital twin, what-if)
+try:
+    from features import (
+        render_sentiment_tab, render_portfolio_sentiment, SentimentVaR,
+        HAS_SENTIMENT_FEATURE
+    )
+except ImportError:
+    HAS_SENTIMENT_FEATURE = False
+
+try:
+    from features import (
+        render_digital_twin_tab, render_quick_scenario_widget,
+        DigitalTwinEngine, HAS_DIGITAL_TWIN
+    )
+except ImportError:
+    HAS_DIGITAL_TWIN = False
+
+try:
+    from features import (
+        render_what_if_tab, render_scenario_builder,
+        WhatIfAnalyzer, HAS_WHAT_IF
+    )
+except ImportError:
+    HAS_WHAT_IF = False
+
+# Import sentiment service
+try:
+    from services import SentimentService, HAS_SENTIMENT
+except ImportError:
+    HAS_SENTIMENT = False
+
 try:
     from config.settings import COLORS as CONFIG_COLORS, POPULAR_STOCKS as CONFIG_STOCKS
 except ImportError:
@@ -63,6 +94,8 @@ try:
         black_litterman_optimization, PortfolioOptimizer,
         threshold_rebalancing, calculate_rebalance_costs,
         tax_loss_harvesting_opportunities, portfolio_risk_decomposition,
+        # New: Simulation & Correlation
+        PortfolioSimulator, SimulationConfig, DynamicRebalancer, CorrelationMonitor,
         # Visualization
         interactive_correlation_heatmap, rolling_correlation_chart,
         volatility_surface_3d, var_cone_chart, var_comparison_chart,
@@ -70,8 +103,15 @@ try:
         performance_attribution_chart, rolling_performance_chart,
         factor_exposure_chart, regime_chart, VisualizationEngine,
         make_chart_downloadable, apply_dark_theme,
+        # New: Enhanced Visualization
+        enhanced_volatility_surface_3d, volatility_smile_cross_sections,
+        term_structure_chart, efficient_frontier_chart,
+        interactive_weight_slider_chart, weight_allocation_chart,
         # Realtime
-        get_live_quote, is_market_open, calculate_live_pnl, RealtimeEngine
+        get_live_quote, is_market_open, calculate_live_pnl, RealtimeEngine,
+        # New: WebSocket Realtime
+        WebSocketPriceStream, RealTimePriceAggregator,
+        create_realtime_dashboard, display_websocket_status
     )
     HAS_ENHANCED_UTILS = True
 except ImportError as e:
@@ -317,6 +357,40 @@ with st.sidebar:
     else:
         st.warning("⚡ Using GradientBoosting\n(XGBoost unavailable)")
     
+    # New Feature Toggles (v4.3)
+    st.divider()
+    st.markdown("### 🆕 New Features")
+    
+    # Sentiment Analysis Toggle
+    enable_sentiment = False
+    if HAS_SENTIMENT_FEATURE and HAS_SENTIMENT:
+        enable_sentiment = st.toggle("🧠 Sentiment Analysis", value=False,
+                                     help="NLP-based sentiment scoring and VaR adjustment")
+    
+    # Digital Twin Toggle
+    enable_digital_twin = False
+    if HAS_DIGITAL_TWIN:
+        enable_digital_twin = st.toggle("🔮 Digital Twin", value=False,
+                                        help="Portfolio scenario simulation and comparison")
+    
+    # What-If Toggle
+    enable_what_if = False
+    if HAS_WHAT_IF:
+        enable_what_if = st.toggle("🎯 What-If Analysis", value=False,
+                                   help="Interactive portfolio weight adjustment")
+    
+    # Real-time WebSocket Toggle
+    enable_websocket = False
+    if HAS_ENHANCED_UTILS:
+        enable_websocket = st.toggle("⚡ Real-time WebSocket", value=False,
+                                     help="Sub-second price updates via WebSocket")
+    
+    # Store in session state
+    st.session_state.enable_sentiment = enable_sentiment
+    st.session_state.enable_digital_twin = enable_digital_twin
+    st.session_state.enable_what_if = enable_what_if
+    st.session_state.enable_websocket = enable_websocket
+    
     st.divider()
     
     # App Mode Switcher (at bottom of sidebar)
@@ -334,7 +408,7 @@ with st.sidebar:
         st.info("TA Signals extension not available")
     
     st.divider()
-    st.caption("v4.2" + (" | Enhanced" if HAS_ENHANCED_UTILS else "") + (" | TA" if HAS_TA_SIGNALS else ""))
+    st.caption("v4.3" + (" | Enhanced" if HAS_ENHANCED_UTILS else "") + (" | TA" if HAS_TA_SIGNALS else "") + (" | 🧠" if enable_sentiment else "") + (" | 🔮" if enable_digital_twin else ""))
 
 # ============================================================================
 # TA SIGNALS MODE
@@ -638,18 +712,27 @@ if mode == "Single Stock":
         h_var = historical_var(rets, var_horizon, conf_level)
         cv = cvar(rets, conf_level)
         
-        # Define tabs - include Enhanced if utils available
-        if HAS_ENHANCED_UTILS:
+        # Define tabs - include Enhanced and new features if available
+        enable_sentiment = st.session_state.get('enable_sentiment', False)
+        
+        if HAS_ENHANCED_UTILS and enable_sentiment and HAS_SENTIMENT_FEATURE:
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
+                "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
+                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Enhanced ✨", "Sentiment 🧠", "Export"
+            ])
+        elif HAS_ENHANCED_UTILS:
             tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
                 "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
                 "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Enhanced ✨", "Export"
             ])
+            tab12 = None
         else:
             tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
                 "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
                 "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Export"
             ])
             tab11 = None
+            tab12 = None
         
         # TAB 1: OVERVIEW
         with tab1:
@@ -1504,10 +1587,30 @@ if mode == "Single Stock":
                             f"{ticker}_chart.html", "text/html"
                         )
             
-            # TAB 11: EXPORT (was tab10)
-            export_tab = tab11
-        else:
-            export_tab = tab10
+            # TAB 11: SENTIMENT ANALYSIS (v4.3)
+            if tab12 is not None and st.session_state.get('enable_sentiment', False):
+                with tab11:
+                    st.subheader("Sentiment Analysis 🧠")
+                    st.caption("NLP-based sentiment scoring and VaR adjustment")
+                    
+                    try:
+                        # Create returns DataFrame for sentiment analysis
+                        returns_df = pd.DataFrame({ticker: rets})
+                        weights = {ticker: 1.0}
+                        
+                        # Render sentiment tab
+                        render_sentiment_tab(ticker, returns_df)
+                        
+                    except Exception as e:
+                        st.error(f"Sentiment analysis error: {e}")
+                        st.info("Make sure TextBlob and/or VADER are installed.")
+                
+                # Update export tab reference
+                export_tab = tab12
+            elif HAS_ENHANCED_UTILS and tab11 is not None:
+                export_tab = tab11
+            else:
+                export_tab = tab10
         
         with export_tab:
             st.subheader("Export Data & Reports")
@@ -1750,19 +1853,29 @@ else:
         prices_df = st.session_state.port_prices_df
         weights = st.session_state.port_weights
         
-        # Define tabs - include Enhanced if utils available
-        if HAS_ENHANCED_UTILS:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-                "Summary", "Monte Carlo", "Correlation", "Stress Test", 
-                "Optimization", "Enhanced ✨", "Charts", "Export"
-            ])
-        else:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-                "Summary", "Monte Carlo", "Correlation", "Stress Test", "Optimization", "Charts", "Export"
-            ])
-            tab8 = None
+        # Define tabs - include Enhanced and new features if available
+        enable_digital_twin = st.session_state.get('enable_digital_twin', False)
+        enable_what_if = st.session_state.get('enable_what_if', False)
         
-        with tab1:
+        tab_list = ["Summary", "Monte Carlo", "Correlation", "Stress Test", "Optimization"]
+        
+        if HAS_ENHANCED_UTILS:
+            tab_list.append("Enhanced ✨")
+        
+        if enable_digital_twin and HAS_DIGITAL_TWIN:
+            tab_list.append("Digital Twin 🔮")
+        
+        if enable_what_if and HAS_WHAT_IF:
+            tab_list.append("What-If 🎯")
+        
+        tab_list.extend(["Charts", "Export"])
+        
+        tabs = st.tabs(tab_list)
+        tab_idx = 0
+        
+        # TAB: Summary
+        with tabs[tab_idx]:
+            tab_idx += 1
             st.subheader("Portfolio Risk Summary")
             
             col1, col2, col3, col4 = st.columns(4)
@@ -1809,7 +1922,8 @@ else:
             st.plotly_chart(fig_contrib, use_container_width=True)
         
         # TAB 2: MONTE CARLO (NEW FOR PORTFOLIO)
-        with tab2:
+        with tabs[tab_idx]:
+            tab_idx += 1
             st.subheader("Portfolio Monte Carlo Simulation")
             
             col1, col2 = st.columns([1, 3])
@@ -1843,7 +1957,9 @@ else:
                 fig_cone, _, _, _ = create_mc_cone_chart(port_rets, horizon=mc_horizon, theme_dark=theme_dark)
                 st.plotly_chart(fig_cone, use_container_width=True)
         
-        with tab3:
+        # TAB 3: CORRELATION
+        with tabs[tab_idx]:
+            tab_idx += 1
             st.subheader("Correlation Matrix")
             corr_matrix = returns_df.corr()
             fig_corr = px.imshow(corr_matrix, text_auto='.2f', aspect='auto',
@@ -1852,7 +1968,9 @@ else:
             fig_corr.update_layout(height=450, template='plotly_dark' if theme_dark else 'plotly_white')
             st.plotly_chart(fig_corr, use_container_width=True)
         
-        with tab4:
+        # TAB 4: STRESS TESTING
+        with tabs[tab_idx]:
+            tab_idx += 1
             st.subheader("Stress Testing")
             
             col1, col2 = st.columns(2)
@@ -1881,7 +1999,9 @@ else:
             stress_df = pd.DataFrame([{'Asset': k, 'Stressed Return': f"{v:.2%}"} for k, v in stress_results['individual'].items()])
             st.dataframe(stress_df, use_container_width=True, hide_index=True)
         
-        with tab5:
+        # TAB 5: OPTIMIZATION
+        with tabs[tab_idx]:
+            tab_idx += 1
             st.subheader("Portfolio Optimization (MPT)")
             
             with st.spinner("Optimizing..."):
@@ -1916,9 +2036,10 @@ else:
                                     xaxis_title='Volatility', yaxis_title='Expected Return')
                 st.plotly_chart(fig_ef, use_container_width=True)
         
-        # TAB 6: ENHANCED PORTFOLIO ANALYTICS (v4.1)
-        if HAS_ENHANCED_UTILS and tab8 is not None:
-            with tab6:
+        # TAB: ENHANCED PORTFOLIO ANALYTICS (v4.1)
+        if HAS_ENHANCED_UTILS:
+            with tabs[tab_idx]:
+                tab_idx += 1
                 st.subheader("Enhanced Portfolio Analytics ✨")
                 st.caption("Advanced portfolio optimization powered by v4.1 enhancements")
                 
@@ -2119,15 +2240,38 @@ else:
                         '% of Total': '{:.1f}%',
                         'Marginal Contribution': '{:.4f}'
                     }), use_container_width=True, hide_index=True)
-            
-            # Charts tab shifts to tab7
-            charts_tab = tab7
-            export_tab = tab8
-        else:
-            charts_tab = tab6
-            export_tab = tab7
         
-        with charts_tab:
+        # TAB: DIGITAL TWIN (v4.3) - if enabled
+        if enable_digital_twin and HAS_DIGITAL_TWIN:
+            with tabs[tab_idx]:
+                tab_idx += 1
+                try:
+                    render_digital_twin_tab(
+                        returns=returns_df,
+                        weights={t: w for t, w in zip(tickers, weights_array)},
+                        initial_capital=100000
+                    )
+                except Exception as e:
+                    st.error(f"Digital Twin error: {e}")
+                    st.info("Check that the portfolio simulation engine is properly loaded.")
+        
+        # TAB: WHAT-IF ANALYSIS (v4.3) - if enabled
+        if enable_what_if and HAS_WHAT_IF:
+            with tabs[tab_idx]:
+                tab_idx += 1
+                try:
+                    render_what_if_tab(
+                        returns=returns_df,
+                        current_weights={t: w for t, w in zip(tickers, weights_array)},
+                        portfolio_value=100000
+                    )
+                except Exception as e:
+                    st.error(f"What-If Analysis error: {e}")
+                    st.info("Check that the What-If analyzer is properly loaded.")
+        
+        # TAB: CHARTS
+        with tabs[tab_idx]:
+            tab_idx += 1
             cum_rets = (1 + port_rets).cumprod()
             bench_cum = (1 + bench_rets.reindex(port_rets.index).fillna(0)).cumprod()
             
@@ -2152,7 +2296,9 @@ else:
             fig_vol.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=300)
             st.plotly_chart(fig_vol, use_container_width=True)
         
-        with export_tab:
+        # TAB: EXPORT
+        with tabs[tab_idx]:
+            tab_idx += 1
             st.subheader("Export Portfolio Data")
             port_var = portfolio_var(returns_df, weights_array, conf_level)
             port_cvar = cvar(port_rets, conf_level)

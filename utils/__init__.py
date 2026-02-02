@@ -29,7 +29,9 @@ from .portfolio import (
     calculate_rebalance_costs, optimal_rebalance_frequency,
     threshold_rebalancing, tax_loss_harvesting_opportunities,
     PortfolioOptimizer, quick_portfolio_optimize,
-    portfolio_risk_decomposition
+    portfolio_risk_decomposition,
+    SimulationConfig, PortfolioSimulator, DynamicRebalancer,
+    CorrelationMonitor
 )
 
 from .visualization import (
@@ -40,12 +42,17 @@ from .visualization import (
     performance_attribution_chart, rolling_performance_chart,
     make_chart_downloadable, figure_to_png_base64, get_download_link,
     factor_exposure_chart, regime_chart, VisualizationEngine,
-    apply_dark_theme, DARK_THEME
+    apply_dark_theme, DARK_THEME,
+    enhanced_volatility_surface_3d, volatility_smile_cross_sections,
+    term_structure_chart, efficient_frontier_chart,
+    interactive_weight_slider_chart, weight_allocation_chart
 )
 
 from .realtime import (
     get_live_quote, is_market_open, calculate_live_pnl,
-    PriceStream, RealtimeEngine, MARKET_SCHEDULES
+    PriceStream, RealtimeEngine, MARKET_SCHEDULES,
+    WebSocketPriceStream, RealTimePriceAggregator,
+    create_realtime_dashboard, display_websocket_status
 )
 
 __all__ = [
@@ -72,6 +79,8 @@ __all__ = [
     'threshold_rebalancing', 'tax_loss_harvesting_opportunities',
     'PortfolioOptimizer', 'quick_portfolio_optimize',
     'portfolio_risk_decomposition',
+    'SimulationConfig', 'PortfolioSimulator', 'DynamicRebalancer',
+    'CorrelationMonitor',
     
     # Visualization
     'interactive_correlation_heatmap', 'rolling_correlation_chart',
@@ -82,9 +91,14 @@ __all__ = [
     'make_chart_downloadable', 'figure_to_png_base64', 'get_download_link',
     'factor_exposure_chart', 'regime_chart', 'VisualizationEngine',
     'apply_dark_theme', 'DARK_THEME',
+    'enhanced_volatility_surface_3d', 'volatility_smile_cross_sections',
+    'term_structure_chart', 'efficient_frontier_chart',
+    'interactive_weight_slider_chart', 'weight_allocation_chart',
     
     # Realtime
     'get_live_quote', 'is_market_open', 'calculate_live_pnl',
     'PriceStream', 'RealtimeEngine', 'MARKET_SCHEDULES',
+    'WebSocketPriceStream', 'RealTimePriceAggregator',
+    'create_realtime_dashboard', 'display_websocket_status',
 ]
 

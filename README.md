@@ -5,7 +5,43 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-4.2-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-4.3-brightgreen.svg)
+
+## What's New in v4.3
+
+### 🔮 Portfolio Digital Twin
+- **Scenario Simulation** - Monte Carlo simulation of rebalancing strategies
+- **Strategy Comparison** - Buy-and-hold vs Monthly/Quarterly/Threshold rebalancing
+- **Tax-Loss Harvesting** - Simulate tax-optimized portfolio management
+- **Portfolio Health Score** - Comprehensive 0-100 health assessment with recommendations
+- **Correlation Monitoring** - Real-time alerts when normally uncorrelated assets converge
+
+### 🧠 Behavioral Finance & Sentiment Analysis
+- **NLP Sentiment Scoring** - TextBlob + VADER dual-analyzer with financial lexicon
+- **Sentiment-Adjusted VaR** - VaR adjustment based on market sentiment (0.7x-1.5x multiplier)
+- **News Sentiment Tracking** - Real-time sentiment analysis from financial news
+- **Whale Activity Tracking** - Monitor large institutional transactions
+- **Portfolio Sentiment Heatmap** - Visualize sentiment across holdings
+
+### 🎯 Interactive What-If Analysis
+- **Real-time Weight Adjustment** - Interactive sliders with immediate metric updates
+- **Efficient Frontier Overlay** - See your portfolio position relative to optimal frontier
+- **Trade Recommendations** - Automatic rebalancing trade list with cost estimates
+- **Scenario Builder** - Save and compare multiple portfolio scenarios
+
+### ⚡ Enhanced Real-time Data Pipeline
+- **Polygon.io Integration** - Professional market data with WebSocket streaming
+- **Alpaca Markets Integration** - Real-time quotes with paper/live trading support
+- **WebSocket Price Streaming** - Sub-second price updates during market hours
+- **Multi-Provider Fallback** - Automatic failover between data sources
+
+### 📊 Enhanced Visualizations
+- **3D Volatility Surfaces** - Interactive rotation, slicing, and ATM term structure
+- **Volatility Smile Cross-Sections** - Time-horizon slices of IV surface
+- **Fan Charts** - Probability distribution over simulation horizon
+- **Correlation Change Charts** - Rolling average correlation with stress indicators
+
+---
 
 ## What's New in v4.2
 

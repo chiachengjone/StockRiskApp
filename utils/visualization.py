@@ -974,6 +974,586 @@ def regime_chart(
 # VISUALIZATION ENGINE CLASS
 # =============================================================================
 
+# =============================================================================
+# ENHANCED 3D VOLATILITY SURFACES WITH SLICING
+# =============================================================================
+
+def enhanced_volatility_surface_3d(
+    strikes: np.ndarray,
+    expirations: np.ndarray,
+    implied_vols: np.ndarray,
+    spot_price: float = None,
+    title: str = "Enhanced Implied Volatility Surface",
+    show_slices: bool = True,
+    slice_expiry: float = None
+) -> go.Figure:
+    """
+    Create enhanced 3D implied volatility surface with interactive features.
+    
+    Features:
+    - Interactive rotation, zoom, pan
+    - Time horizon cross-sections
+    - Volatility smile slices
+    - ATM volatility highlighting
+    - Contour projections
+    
+    Args:
+        strikes: Array of strike prices
+        expirations: Array of expiration times (in years)
+        implied_vols: 2D array of implied volatilities
+        spot_price: Current spot price
+        title: Chart title
+        show_slices: Show cross-section slices
+        slice_expiry: Specific expiry for slice highlight
+    
+    Returns:
+        Plotly figure
+    """
+    # Create meshgrid for surface
+    K, T = np.meshgrid(strikes, expirations)
+    
+    fig = go.Figure()
+    
+    # Main surface
+    fig.add_trace(go.Surface(
+        x=K,
+        y=T,
+        z=implied_vols,
+        colorscale='Viridis',
+        opacity=0.9,
+        colorbar=dict(
+            title="IV",
+            titleside="right",
+            x=1.02
+        ),
+        contours=dict(
+            x=dict(show=True, color='white', width=1),
+            y=dict(show=True, color='white', width=1),
+            z=dict(show=True, color='white', width=1)
+        ),
+        hovertemplate=(
+            "Strike: %{x:.0f}<br>"
+            "Expiry: %{y:.3f}y<br>"
+            "IV: %{z:.1%}<extra></extra>"
+        ),
+        name='IV Surface'
+    ))
+    
+    # Add ATM line if spot provided
+    if spot_price is not None:
+        # ATM volatilities along term structure
+        atm_idx = np.argmin(np.abs(strikes - spot_price))
+        atm_vols = implied_vols[:, atm_idx]
+        
+        fig.add_trace(go.Scatter3d(
+            x=[spot_price] * len(expirations),
+            y=expirations,
+            z=atm_vols,
+            mode='lines+markers',
+            line=dict(color='#FF5722', width=6),
+            marker=dict(size=4, color='#FF5722'),
+            name='ATM Term Structure'
+        ))
+        
+        # Add vertical plane at spot
+        plane_y, plane_z = np.meshgrid(expirations, np.linspace(0, implied_vols.max() * 1.1, 10))
+        plane_x = np.ones_like(plane_y) * spot_price
+        
+        fig.add_trace(go.Surface(
+            x=plane_x,
+            y=plane_y,
+            z=plane_z,
+            colorscale=[[0, 'rgba(255,87,34,0.1)'], [1, 'rgba(255,87,34,0.1)']],
+            showscale=False,
+            opacity=0.3,
+            name='Spot Plane',
+            showlegend=False
+        ))
+    
+    # Add time slice
+    if show_slices and slice_expiry is not None:
+        exp_idx = np.argmin(np.abs(expirations - slice_expiry))
+        slice_vols = implied_vols[exp_idx, :]
+        
+        fig.add_trace(go.Scatter3d(
+            x=strikes,
+            y=[expirations[exp_idx]] * len(strikes),
+            z=slice_vols,
+            mode='lines+markers',
+            line=dict(color='#4CAF50', width=5),
+            marker=dict(size=3, color='#4CAF50'),
+            name=f'{expirations[exp_idx]:.2f}y Smile'
+        ))
+    
+    # Camera angles for different views
+    camera_views = {
+        'default': dict(eye=dict(x=1.5, y=1.5, z=0.8)),
+        'top': dict(eye=dict(x=0, y=0, z=2.5)),
+        'front': dict(eye=dict(x=0, y=2.5, z=0.5)),
+        'side': dict(eye=dict(x=2.5, y=0, z=0.5))
+    }
+    
+    # Add view buttons
+    buttons = []
+    for view_name, camera in camera_views.items():
+        buttons.append(dict(
+            args=[{'scene.camera': camera}],
+            label=view_name.title(),
+            method='relayout'
+        ))
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        scene=dict(
+            xaxis_title="Strike",
+            yaxis_title="Time to Expiry (Years)",
+            zaxis_title="Implied Volatility",
+            camera=camera_views['default'],
+            bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(
+                backgroundcolor="rgba(30,30,30,0.9)",
+                gridcolor="rgba(100,100,100,0.5)",
+                showbackground=True
+            ),
+            yaxis=dict(
+                backgroundcolor="rgba(30,30,30,0.9)",
+                gridcolor="rgba(100,100,100,0.5)",
+                showbackground=True
+            ),
+            zaxis=dict(
+                backgroundcolor="rgba(30,30,30,0.9)",
+                gridcolor="rgba(100,100,100,0.5)",
+                showbackground=True,
+                tickformat='.0%'
+            ),
+            aspectratio=dict(x=1.2, y=1, z=0.7)
+        ),
+        updatemenus=[dict(
+            type='buttons',
+            showactive=True,
+            y=0.8,
+            x=1.15,
+            buttons=buttons
+        )],
+        height=700,
+        margin=dict(l=0, r=100, t=50, b=0)
+    )
+    
+    return apply_dark_theme(fig)
+
+
+def volatility_smile_cross_sections(
+    strikes: np.ndarray,
+    expirations: np.ndarray,
+    implied_vols: np.ndarray,
+    spot_price: float = None,
+    title: str = "Volatility Smile Cross-Sections"
+) -> go.Figure:
+    """
+    Create 2D chart showing volatility smiles at different expirations.
+    
+    Args:
+        strikes: Array of strike prices
+        expirations: Array of expiration times
+        implied_vols: 2D array of implied volatilities
+        spot_price: Current spot price
+        title: Chart title
+    
+    Returns:
+        Plotly figure with multiple smile curves
+    """
+    fig = go.Figure()
+    
+    # Color gradient for different expirations
+    colors = px.colors.sequential.Viridis
+    n_exp = len(expirations)
+    
+    for i, exp in enumerate(expirations):
+        color_idx = int(i * (len(colors) - 1) / max(n_exp - 1, 1))
+        
+        # Convert to moneyness if spot provided
+        if spot_price:
+            x_axis = (strikes / spot_price - 1) * 100  # % moneyness
+            x_title = "Moneyness (%)"
+        else:
+            x_axis = strikes
+            x_title = "Strike"
+        
+        fig.add_trace(go.Scatter(
+            x=x_axis,
+            y=implied_vols[i, :] * 100,  # Convert to %
+            mode='lines+markers',
+            name=f'{exp:.2f}y',
+            line=dict(color=colors[color_idx], width=2),
+            marker=dict(size=4)
+        ))
+    
+    # Add ATM reference line
+    if spot_price:
+        fig.add_vline(x=0, line_dash='dash', line_color='white', opacity=0.5)
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        xaxis_title=x_title if spot_price else 'Strike',
+        yaxis_title="Implied Volatility (%)",
+        legend=dict(
+            title="Expiration",
+            orientation='v',
+            yanchor='top',
+            y=1,
+            xanchor='left',
+            x=1.02
+        ),
+        height=450,
+        hovermode='x unified'
+    )
+    
+    return apply_dark_theme(fig)
+
+
+def term_structure_chart(
+    expirations: np.ndarray,
+    atm_vols: np.ndarray,
+    forward_vols: np.ndarray = None,
+    title: str = "Volatility Term Structure"
+) -> go.Figure:
+    """
+    Create term structure chart showing ATM volatility vs expiration.
+    
+    Args:
+        expirations: Array of expiration times
+        atm_vols: ATM implied volatilities
+        forward_vols: Optional forward volatilities
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    fig = go.Figure()
+    
+    # ATM volatility curve
+    fig.add_trace(go.Scatter(
+        x=expirations,
+        y=atm_vols * 100,
+        mode='lines+markers',
+        name='ATM IV',
+        line=dict(color='#2196F3', width=3),
+        marker=dict(size=8),
+        fill='tozeroy',
+        fillcolor='rgba(33,150,243,0.1)'
+    ))
+    
+    # Forward volatility if provided
+    if forward_vols is not None:
+        fig.add_trace(go.Scatter(
+            x=expirations[:-1],
+            y=forward_vols * 100,
+            mode='lines+markers',
+            name='Forward Vol',
+            line=dict(color='#FF9800', width=2, dash='dash'),
+            marker=dict(size=6)
+        ))
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        xaxis_title="Time to Expiry (Years)",
+        yaxis_title="Volatility (%)",
+        height=400,
+        hovermode='x unified'
+    )
+    
+    return apply_dark_theme(fig)
+
+
+# =============================================================================
+# EFFICIENT FRONTIER VISUALIZATION
+# =============================================================================
+
+def efficient_frontier_chart(
+    expected_returns: np.ndarray,
+    volatilities: np.ndarray,
+    sharpe_ratios: np.ndarray = None,
+    asset_names: List[str] = None,
+    asset_returns: np.ndarray = None,
+    asset_vols: np.ndarray = None,
+    current_portfolio: Tuple[float, float] = None,
+    optimal_portfolio: Tuple[float, float] = None,
+    title: str = "Efficient Frontier"
+) -> go.Figure:
+    """
+    Create efficient frontier visualization with asset points.
+    
+    Args:
+        expected_returns: Array of portfolio returns on frontier
+        volatilities: Array of portfolio volatilities on frontier
+        sharpe_ratios: Optional Sharpe ratios for coloring
+        asset_names: Individual asset names
+        asset_returns: Individual asset returns
+        asset_vols: Individual asset volatilities
+        current_portfolio: Current portfolio (vol, return)
+        optimal_portfolio: Optimal portfolio (vol, return)
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    fig = go.Figure()
+    
+    # Efficient frontier line
+    if sharpe_ratios is not None:
+        # Color by Sharpe ratio
+        fig.add_trace(go.Scatter(
+            x=volatilities * 100,
+            y=expected_returns * 100,
+            mode='lines+markers',
+            marker=dict(
+                size=8,
+                color=sharpe_ratios,
+                colorscale='RdYlGn',
+                colorbar=dict(title="Sharpe"),
+                showscale=True
+            ),
+            line=dict(width=3, color='rgba(100,100,100,0.3)'),
+            name='Efficient Frontier',
+            hovertemplate=(
+                "Volatility: %{x:.1f}%<br>"
+                "Return: %{y:.1f}%<br>"
+                "Sharpe: %{marker.color:.2f}<extra></extra>"
+            )
+        ))
+    else:
+        fig.add_trace(go.Scatter(
+            x=volatilities * 100,
+            y=expected_returns * 100,
+            mode='lines',
+            line=dict(width=3, color='#4CAF50'),
+            name='Efficient Frontier',
+            hovertemplate="Vol: %{x:.1f}% | Return: %{y:.1f}%<extra></extra>"
+        ))
+    
+    # Individual assets
+    if asset_names and asset_returns is not None and asset_vols is not None:
+        fig.add_trace(go.Scatter(
+            x=asset_vols * 100,
+            y=asset_returns * 100,
+            mode='markers+text',
+            marker=dict(size=12, color='#FF9800', symbol='diamond'),
+            text=asset_names,
+            textposition='top center',
+            textfont=dict(size=10),
+            name='Assets',
+            hovertemplate="<b>%{text}</b><br>Vol: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>"
+        ))
+    
+    # Current portfolio
+    if current_portfolio:
+        fig.add_trace(go.Scatter(
+            x=[current_portfolio[0] * 100],
+            y=[current_portfolio[1] * 100],
+            mode='markers',
+            marker=dict(size=15, color='#F44336', symbol='circle'),
+            name='Current Portfolio',
+            hovertemplate="Current<br>Vol: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>"
+        ))
+    
+    # Optimal portfolio
+    if optimal_portfolio:
+        fig.add_trace(go.Scatter(
+            x=[optimal_portfolio[0] * 100],
+            y=[optimal_portfolio[1] * 100],
+            mode='markers',
+            marker=dict(size=15, color='#4CAF50', symbol='star'),
+            name='Optimal Portfolio',
+            hovertemplate="Optimal<br>Vol: %{x:.1f}%<br>Return: %{y:.1f}%<extra></extra>"
+        ))
+        
+        # Draw line from current to optimal
+        if current_portfolio:
+            fig.add_trace(go.Scatter(
+                x=[current_portfolio[0] * 100, optimal_portfolio[0] * 100],
+                y=[current_portfolio[1] * 100, optimal_portfolio[1] * 100],
+                mode='lines',
+                line=dict(color='white', width=1, dash='dot'),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+    
+    # Capital Market Line (if we have optimal and risk-free info)
+    if optimal_portfolio:
+        rf_rate = 0.05  # Assume 5% risk-free
+        sharpe = (optimal_portfolio[1] - rf_rate) / optimal_portfolio[0]
+        
+        # Extend CML
+        max_vol = max(volatilities) * 1.2
+        cml_vols = np.linspace(0, max_vol, 100)
+        cml_returns = rf_rate + sharpe * cml_vols
+        
+        fig.add_trace(go.Scatter(
+            x=cml_vols * 100,
+            y=cml_returns * 100,
+            mode='lines',
+            line=dict(color='#2196F3', width=2, dash='dash'),
+            name='Capital Market Line',
+            hoverinfo='skip'
+        ))
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        xaxis_title="Volatility (%)",
+        yaxis_title="Expected Return (%)",
+        height=550,
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='center',
+            x=0.5
+        ),
+        hovermode='closest'
+    )
+    
+    return apply_dark_theme(fig)
+
+
+def interactive_weight_slider_chart(
+    assets: List[str],
+    current_weights: Dict[str, float],
+    returns: pd.DataFrame,
+    n_frontier_points: int = 50
+) -> Tuple[go.Figure, Dict]:
+    """
+    Create efficient frontier with weight visualization for interactive adjustment.
+    
+    Note: This returns the figure and data needed for Streamlit sliders.
+    The actual interactivity is handled in the Streamlit layer.
+    
+    Args:
+        assets: List of asset names
+        current_weights: Current portfolio weights
+        returns: Historical returns DataFrame
+        n_frontier_points: Number of points on frontier
+    
+    Returns:
+        Tuple of (figure, frontier_data dict)
+    """
+    # Calculate frontier
+    from scipy.optimize import minimize
+    
+    mean_returns = returns.mean().values * 252
+    cov_matrix = returns.cov().values * 252
+    n_assets = len(assets)
+    
+    def portfolio_stats(weights):
+        ret = np.dot(weights, mean_returns)
+        vol = np.sqrt(weights.T @ cov_matrix @ weights)
+        return ret, vol
+    
+    def min_volatility(target_return):
+        def volatility(w):
+            return np.sqrt(w.T @ cov_matrix @ w)
+        
+        constraints = [
+            {'type': 'eq', 'fun': lambda w: np.sum(w) - 1},
+            {'type': 'eq', 'fun': lambda w: np.dot(w, mean_returns) - target_return}
+        ]
+        bounds = tuple((0, 1) for _ in range(n_assets))
+        
+        result = minimize(
+            volatility,
+            np.ones(n_assets) / n_assets,
+            method='SLSQP',
+            bounds=bounds,
+            constraints=constraints
+        )
+        return result.x if result.success else None
+    
+    # Generate frontier points
+    target_returns = np.linspace(mean_returns.min(), mean_returns.max(), n_frontier_points)
+    frontier_vols = []
+    frontier_rets = []
+    frontier_weights = []
+    
+    for target in target_returns:
+        weights = min_volatility(target)
+        if weights is not None:
+            ret, vol = portfolio_stats(weights)
+            frontier_rets.append(ret)
+            frontier_vols.append(vol)
+            frontier_weights.append(dict(zip(assets, weights)))
+    
+    # Calculate current portfolio position
+    current_w = np.array([current_weights.get(a, 0) for a in assets])
+    current_ret, current_vol = portfolio_stats(current_w)
+    
+    # Create chart
+    sharpe_ratios = np.array(frontier_rets) / np.array(frontier_vols)
+    
+    fig = efficient_frontier_chart(
+        expected_returns=np.array(frontier_rets),
+        volatilities=np.array(frontier_vols),
+        sharpe_ratios=sharpe_ratios,
+        asset_names=assets,
+        asset_returns=mean_returns,
+        asset_vols=np.sqrt(np.diag(cov_matrix)),
+        current_portfolio=(current_vol, current_ret)
+    )
+    
+    frontier_data = {
+        'returns': frontier_rets,
+        'volatilities': frontier_vols,
+        'weights': frontier_weights,
+        'sharpe_ratios': sharpe_ratios.tolist(),
+        'current': {'return': current_ret, 'volatility': current_vol}
+    }
+    
+    return fig, frontier_data
+
+
+def weight_allocation_chart(
+    weights: Dict[str, float],
+    title: str = "Portfolio Allocation"
+) -> go.Figure:
+    """
+    Create horizontal bar chart showing portfolio weights.
+    
+    Args:
+        weights: Portfolio weights
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    # Sort by weight
+    sorted_weights = dict(sorted(weights.items(), key=lambda x: x[1], reverse=True))
+    
+    assets = list(sorted_weights.keys())
+    values = [v * 100 for v in sorted_weights.values()]
+    
+    # Colors based on size
+    colors = ['#4CAF50' if v > 15 else '#2196F3' if v > 5 else '#9E9E9E' for v in values]
+    
+    fig = go.Figure(go.Bar(
+        x=values,
+        y=assets,
+        orientation='h',
+        marker_color=colors,
+        text=[f'{v:.1f}%' for v in values],
+        textposition='outside',
+        hovertemplate="<b>%{y}</b><br>Weight: %{x:.1f}%<extra></extra>"
+    ))
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        xaxis_title="Weight (%)",
+        yaxis_title="Asset",
+        height=max(300, len(assets) * 35),
+        showlegend=False,
+        xaxis=dict(range=[0, max(values) * 1.2])
+    )
+    
+    return apply_dark_theme(fig)
+
+
 class VisualizationEngine:
     """
     Unified interface for all visualization features.

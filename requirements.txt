@@ -1,4 +1,4 @@
-# Stock Risk Modelling App - Enterprise Edition v4.1
+# Stock Risk Modelling App - Enterprise Edition v4.3
 # ==================================================
 # pip install -r requirements.txt
 
@@ -43,6 +43,17 @@ pytz>=2023.3
 
 # Enhanced clustering for HRP and regime detection
 # (scipy already provides most clustering needs)
+
+# =============================================
+# NEW in v4.3 - Advanced Features
+# =============================================
+
+# WebSocket real-time data streaming
+websocket-client>=1.6.0
+
+# Sentiment Analysis (optional)
+textblob>=0.17.0
+vaderSentiment>=3.3.2
 
 # Optional: Deep learning for LSTM volatility forecasting
 # Uncomment if you want LSTM capabilities:

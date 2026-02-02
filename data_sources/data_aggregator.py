@@ -17,6 +17,19 @@ from .base_provider import BaseDataProvider
 from .yahoo_provider import YahooProvider
 from .alpha_vantage_provider import AlphaVantageProvider
 
+# Import new professional providers (optional)
+try:
+    from .polygon_provider import PolygonProvider
+    HAS_POLYGON = True
+except ImportError:
+    HAS_POLYGON = False
+
+try:
+    from .alpaca_provider import AlpacaProvider
+    HAS_ALPACA = True
+except ImportError:
+    HAS_ALPACA = False
+
 
 class DataAggregator:
     """
@@ -25,9 +38,16 @@ class DataAggregator:
     - Data validation and cross-checking
     - Caching to reduce API calls
     - Rate limit management
+    - Support for professional APIs (Polygon.io, Alpaca)
     """
     
-    def __init__(self, alpha_vantage_key: str = ""):
+    def __init__(
+        self, 
+        alpha_vantage_key: str = "",
+        polygon_key: str = "",
+        alpaca_key: str = "",
+        alpaca_secret: str = ""
+    ):
         self.logger = logging.getLogger(__name__)
         
         # Initialize providers
@@ -36,8 +56,22 @@ class DataAggregator:
             'alpha_vantage': AlphaVantageProvider(api_key=alpha_vantage_key)
         }
         
+        # Add Polygon provider if available and configured
+        if HAS_POLYGON and polygon_key:
+            self.providers['polygon'] = PolygonProvider(api_key=polygon_key)
+            self.logger.info("Polygon.io provider initialized")
+        
+        # Add Alpaca provider if available and configured
+        if HAS_ALPACA and alpaca_key and alpaca_secret:
+            self.providers['alpaca'] = AlpacaProvider(
+                api_key=alpaca_key, 
+                api_secret=alpaca_secret
+            )
+            self.logger.info("Alpaca provider initialized")
+        
         # Default provider order (primary first)
-        self.provider_order = ['yahoo', 'alpha_vantage']
+        # Professional APIs first if available, then free sources
+        self.provider_order = self._build_provider_order()
         
         # Cache settings
         self.cache_enabled = True
@@ -52,6 +86,123 @@ class DataAggregator:
             'fallbacks': 0,
             'failures': 0
         }
+    
+    def _build_provider_order(self) -> List[str]:
+        """Build provider priority order based on available APIs."""
+        order = []
+        
+        # Professional APIs first (lower latency, higher reliability)
+        if 'polygon' in self.providers:
+            order.append('polygon')
+        if 'alpaca' in self.providers:
+            order.append('alpaca')
+        
+        # Free sources as fallback
+        order.append('yahoo')
+        if 'alpha_vantage' in self.providers and self.providers['alpha_vantage'].api_key:
+            order.append('alpha_vantage')
+        
+        return order
+    
+    def add_provider(self, name: str, provider: BaseDataProvider):
+        """
+        Add a custom data provider.
+        
+        Args:
+            name: Provider name
+            provider: Provider instance implementing BaseDataProvider
+        """
+        self.providers[name] = provider
+        self.provider_order = self._build_provider_order()
+        self.logger.info(f"Added provider: {name}")
+    
+    def get_real_time_quote(self, ticker: str) -> Tuple[Dict, str]:
+        """
+        Get real-time quote using best available provider.
+        
+        Professional APIs (Polygon, Alpaca) are preferred for real-time data.
+        
+        Args:
+            ticker: Stock symbol
+        
+        Returns:
+            Tuple of (quote_dict, source_name)
+        """
+        # Prefer professional APIs for real-time quotes
+        realtime_providers = ['polygon', 'alpaca', 'yahoo']
+        
+        for provider_name in realtime_providers:
+            provider = self.providers.get(provider_name)
+            if not provider:
+                continue
+            
+            try:
+                if hasattr(provider, 'get_real_time_quote'):
+                    quote = provider.get_real_time_quote(ticker)
+                    if quote and 'error' not in quote:
+                        return quote, provider_name
+                elif hasattr(provider, 'get_snapshot'):
+                    quote = provider.get_snapshot(ticker)
+                    if quote and 'error' not in quote:
+                        return quote, provider_name
+            except Exception as e:
+                self.logger.warning(f"{provider_name} real-time quote failed: {e}")
+                continue
+        
+        # Fallback to Yahoo info
+        try:
+            from .yahoo_provider import YahooProvider
+            yahoo = self.providers.get('yahoo')
+            if yahoo:
+                info = yahoo.fetch_info(ticker)
+                return {
+                    'ticker': ticker,
+                    'price': info.get('price'),
+                    'prev_close': info.get('prev_close'),
+                    'volume': info.get('avg_volume'),
+                    'source': 'yahoo'
+                }, 'yahoo'
+        except Exception:
+            pass
+        
+        return {'ticker': ticker, 'error': 'No real-time data'}, 'none'
+    
+    def get_news(
+        self, 
+        ticker: str = None, 
+        limit: int = 10
+    ) -> Tuple[List[Dict], str]:
+        """
+        Fetch news from available providers.
+        
+        Args:
+            ticker: Stock symbol (optional)
+            limit: Maximum number of articles
+        
+        Returns:
+            Tuple of (news_list, source_name)
+        """
+        # Polygon and Alpaca have news APIs
+        for provider_name in ['polygon', 'alpaca']:
+            provider = self.providers.get(provider_name)
+            if not provider:
+                continue
+            
+            try:
+                if hasattr(provider, 'get_news'):
+                    if provider_name == 'polygon':
+                        news = provider.get_news(ticker=ticker, limit=limit)
+                    else:
+                        symbols = [ticker] if ticker else None
+                        news = provider.get_news(symbols=symbols, limit=limit)
+                    
+                    if news:
+                        return news, provider_name
+            except Exception as e:
+                self.logger.warning(f"{provider_name} news fetch failed: {e}")
+                continue
+        
+        return [], 'none'
     
     def _get_cache_key(self, ticker: str, start: str, end: str, data_type: str = "historical") -> str:
         """Generate cache key."""

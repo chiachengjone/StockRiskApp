@@ -31,6 +31,23 @@ from .signals_service import (
     filter_signals_by_risk
 )
 
+# Sentiment service (optional)
+try:
+    from .sentiment_service import (
+        SentimentService,
+        SentimentResult,
+        NewsArticle,
+        WhaleActivity,
+        TextBlobAnalyzer,
+        VADERAnalyzer,
+        FinancialSentimentAnalyzer,
+        NewsFetcher,
+        WhaleTracker
+    )
+    HAS_SENTIMENT = True
+except ImportError:
+    HAS_SENTIMENT = False
+
 __all__ = [
     # TA Service
     'TAService',
@@ -52,5 +69,11 @@ __all__ = [
     'generate_macd_signals',
     'generate_bollinger_signals',
     'calculate_combined_signal_score',
-    'filter_signals_by_risk'
+    'filter_signals_by_risk',
+    # Sentiment Service
+    'SentimentService',
+    'SentimentResult',
+    'NewsArticle',
+    'WhaleActivity',
+    'HAS_SENTIMENT'
 ]
