@@ -1,11 +1,24 @@
 """
-STOCK RISK MODELLING APP v4.2
+STOCK RISK MODELLING APP v4.4
 ==============================
 Streamlit + yfinance + GARCH + EVT + Monte Carlo + Portfolio Mode + Stress Testing
 + Fama-French Factors + Kelly Criterion + ESG + XGBoost AI VaR
 + Options Analytics + Fundamentals + Comparison + Alerts + PDF Reports
 + Enhanced Analytics + Risk Parity + Black-Litterman + Real-time Features
++ Risk Score | Historical Scenarios | Sector Exposure | VaR Backtesting
++ Performance Attribution | Correlation Network | Risk Budget | Factor Builder
 """
+
+# Load environment variables FIRST before any other imports
+import os
+from pathlib import Path
+try:
+    from dotenv import load_dotenv
+    # Load .env from project root
+    env_path = Path(__file__).parent / '.env'
+    load_dotenv(env_path)
+except ImportError:
+    pass
 
 import streamlit as st
 import pandas as pd
@@ -66,6 +79,16 @@ try:
 except ImportError:
     HAS_WHAT_IF = False
 
+# Import Portfolio Builder (v4.4)
+try:
+    from features import (
+        render_risk_budget_tab, render_factor_builder_tab, render_presets_tab,
+        RiskBudgetOptimizer, FactorPortfolioBuilder, PresetOptimizer,
+        HAS_PORTFOLIO_BUILDER
+    )
+except ImportError:
+    HAS_PORTFOLIO_BUILDER = False
+
 # Import sentiment service
 try:
     from services import SentimentService, HAS_SENTIMENT
@@ -112,7 +135,15 @@ try:
         get_live_quote, is_market_open, calculate_live_pnl, RealtimeEngine,
         # New: WebSocket Realtime
         WebSocketPriceStream, RealTimePriceAggregator,
-        create_realtime_dashboard, display_websocket_status
+        create_realtime_dashboard, display_websocket_status,
+        # New v4.4: Enhanced Analytics & Visualization
+        calculate_unified_risk_score, replay_historical_scenario,
+        replay_all_scenarios, analyze_sector_exposure,
+        calculate_performance_attribution, run_var_backtest,
+        HISTORICAL_SCENARIOS, SECTOR_MAP,
+        create_correlation_network, create_var_backtest_chart,
+        create_sector_pie_chart, create_risk_score_gauge,
+        create_scenario_impact_chart, create_performance_attribution_waterfall
     )
     HAS_ENHANCED_UTILS = True
 except ImportError as e:
@@ -332,27 +363,27 @@ with st.sidebar:
     theme_dark = st.toggle("Dark Charts", value=True)
     auto_refresh = st.toggle("Auto-Refresh (5min)", value=False)
     
-    # New: Alerts Section
+    # Alerts Section
     if HAS_FEATURES:
         st.divider()
         alert_manager = AlertManager()
         alert_summary = alert_manager.get_summary()
         st.markdown(f"**Alerts:** {alert_summary['active_alerts']} active")
         if alert_summary['triggered_today'] > 0:
-            st.warning(f"⚠️ {alert_summary['triggered_today']} alerts triggered today")
+            st.warning(f"{alert_summary['triggered_today']} alerts triggered today")
     
-    # Market Status (v4.1)
+    # Market Status
     if HAS_ENHANCED_UTILS:
         st.divider()
         market_status = is_market_open()
         if market_status.get('is_open', False):
-            st.success("🟢 Market Open")
+            st.success("Market Open")
         else:
-            st.info("🔴 Market Closed")
+            st.info("Market Closed")
     
     # Data Source Display
     st.divider()
-    st.markdown("### 📡 Data Source")
+    st.markdown("### Data Source")
     
     # Get active data source info
     try:
@@ -361,28 +392,28 @@ with st.sidebar:
         
         st.metric("Source", source_info['display_name'])
         st.caption(f"Type: {source_info['type']}")
-        st.success("✅ Connected")
+        st.success("Connected")
         
         # Show available sources count
         enabled_count = sum(1 for s in DATA_SOURCES.values() if s.get('enabled', False) or s.get('api_key'))
         if enabled_count > 1:
-            st.caption(f"📊 {enabled_count} sources available")
+            st.caption(f"{enabled_count} sources available")
     except ImportError:
         st.metric("Source", "Yahoo Finance")
         st.caption("Type: Free API")
-        st.success("✅ Connected")
+        st.success("Connected")
     except Exception:
         st.metric("Source", "Yahoo Finance")
         st.caption("Type: Free API")
-        st.success("✅ Connected")
+        st.success("Connected")
     
     # ML Model Status
     st.divider()
     ml_test = MLPredictor()
     if ml_test.model_type == 'xgboost':
-        st.success("🚀 XGBoost Ready")
+        st.success("XGBoost Ready")
     else:
-        st.warning("⚡ Using GradientBoosting\n(XGBoost unavailable)")
+        st.warning("Using GradientBoosting (XGBoost unavailable)")
     
     # New Features (v4.3) - All enabled by default when available
     # Features are automatically enabled if the modules are available
@@ -396,23 +427,6 @@ with st.sidebar:
     st.session_state.enable_digital_twin = enable_digital_twin
     st.session_state.enable_what_if = enable_what_if
     st.session_state.enable_websocket = enable_websocket
-    
-    # Show active features
-    st.divider()
-    st.markdown("### 📊 Active Features")
-    features_active = []
-    if enable_sentiment:
-        features_active.append("🧠 Sentiment")
-    if enable_digital_twin:
-        features_active.append("🔮 Digital Twin")
-    if enable_what_if:
-        features_active.append("🎯 What-If")
-    if enable_websocket:
-        features_active.append("⚡ WebSocket")
-    if features_active:
-        st.success(" | ".join(features_active))
-    else:
-        st.info("Install optional modules for more features")
     
     st.divider()
     
@@ -431,7 +445,7 @@ with st.sidebar:
         st.info("TA Signals extension not available")
     
     st.divider()
-    st.caption("v4.3" + (" | Enhanced" if HAS_ENHANCED_UTILS else "") + (" | TA" if HAS_TA_SIGNALS else "") + (" | 🧠" if enable_sentiment else "") + (" | 🔮" if enable_digital_twin else ""))
+    st.caption("v4.3" + (" | Enhanced" if HAS_ENHANCED_UTILS else "") + (" | TA" if HAS_TA_SIGNALS else ""))
 
 # ============================================================================
 # TA SIGNALS MODE
@@ -742,7 +756,7 @@ if mode == "Single Stock":
         if enable_sentiment and HAS_SENTIMENT_FEATURE:
             tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
                 "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
-                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Sentiment 🧠", "Export"
+                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Sentiment", "Export"
             ])
             export_tab = tab11
         else:
@@ -834,9 +848,9 @@ if mode == "Single Stock":
                 with col1:
                     market_status = is_market_open()
                     if market_status.get('is_open', False):
-                        st.success("🟢 Market is OPEN")
+                        st.success("Market is OPEN")
                     else:
-                        st.warning("🔴 Market is CLOSED")
+                        st.warning("Market is CLOSED")
                 
                 with col2:
                     if st.button("Refresh Quote", key="overview_refresh"):
@@ -923,9 +937,9 @@ if mode == "Single Stock":
                         
                         # Check if model passed (p-value >= 0.05 means we fail to reject H0)
                         if kupiec['p_value'] >= 0.05:
-                            st.success(f"✅ VaR model PASSED Kupiec test at {bt_confidence:.0%} confidence")
+                            st.success(f"VaR model PASSED Kupiec test at {bt_confidence:.0%} confidence")
                         else:
-                            st.error(f"❌ VaR model FAILED Kupiec test - model may be miscalibrated")
+                            st.error(f"VaR model FAILED Kupiec test - model may be miscalibrated")
                         
                         # Show violations chart
                         fig_bt = go.Figure()
@@ -1123,11 +1137,11 @@ if mode == "Single Stock":
                             with col2:
                                 current_label = regime_result['current_regime']
                                 if 'Bull' in str(current_label):
-                                    st.success("🟢 Bullish Environment")
+                                    st.success("Bullish Environment")
                                 elif 'Bear' in str(current_label):
-                                    st.error("🔴 Bearish Environment")
+                                    st.error("Bearish Environment")
                                 else:
-                                    st.info("🟡 Neutral/Sideways")
+                                    st.info("Neutral/Sideways")
                             
                             # Regime statistics
                             st.markdown("#### Regime Statistics")
@@ -1265,7 +1279,7 @@ if mode == "Single Stock":
             ml = MLPredictor()
             
             # Show model type indicator
-            model_status = "🚀 XGBoost" if ml.model_type == 'xgboost' else "⚡ GradientBoosting"
+            model_status = "XGBoost" if ml.model_type == 'xgboost' else "GradientBoosting"
             st.info(f"Using: **{model_status}** (ML Model)")
             
             with st.spinner(f"Training {ml.model_type} model..."):
@@ -1274,7 +1288,7 @@ if mode == "Single Stock":
             if 'error' not in ml_results:
                 # Display model type used
                 model_name = ml_results.get('model_type', 'ML').replace('_', ' ').title()
-                st.success(f"✅ Model trained successfully using **{model_name}**")
+                st.success(f"Model trained successfully using **{model_name}**")
                 
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("AI Predicted VaR", f"{ml_results['predicted_var']:.2%}")
@@ -1346,7 +1360,7 @@ if mode == "Single Stock":
                             
                             if 'error' not in ensemble:
                                 # Show which model was used
-                                st.success(f"✅ Ensemble complete using {ml_ensemble.model_type.replace('_', ' ').title()}")
+                                st.success(f"Ensemble complete using {ml_ensemble.model_type.replace('_', ' ').title()}")
                                 
                                 col1, col2, col3 = st.columns(3)
                                 col1.metric("Ensemble VaR", f"{ensemble['ensemble_var']:.2%}")
@@ -1479,21 +1493,21 @@ if mode == "Single Stock":
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    st.markdown("##### 📈 Covered Call")
+                    st.markdown("##### Covered Call")
                     st.metric("Premium Received", f"${cc['premium_received']:.2f}")
                     st.metric("Max Profit", f"${cc['max_profit']:.2f}")
                     st.metric("Breakeven", f"${cc['breakeven']:.2f}")
                     st.caption(f"Return if called: {cc['return_if_called']:.1%} ann.")
                 
                 with col2:
-                    st.markdown("##### 🛡️ Protective Put")
+                    st.markdown("##### Protective Put")
                     st.metric("Put Premium", f"${pp['premium_paid']:.2f}")
                     st.metric("Max Loss", f"${pp['max_loss']:.2f}")
                     st.metric("Protection Level", f"${pp['protection_level']:.2f}")
                     st.caption(f"Cost of protection: {pp['cost_of_protection']:.2%}")
                 
                 with col3:
-                    st.markdown("##### 📊 Straddle")
+                    st.markdown("##### Straddle")
                     st.metric("Total Cost", f"${strad['total_cost']:.2f}")
                     st.metric("Upper Breakeven", f"${strad['upper_breakeven']:.2f}")
                     st.metric("Lower Breakeven", f"${strad['lower_breakeven']:.2f}")
@@ -1684,7 +1698,7 @@ if mode == "Single Stock":
         # TAB 10: SENTIMENT ANALYSIS (v4.3) - if enabled
         if tab11 is not None and st.session_state.get('enable_sentiment', False):
             with tab10:
-                st.subheader("Sentiment Analysis 🧠")
+                st.subheader("Sentiment Analysis")
                 st.caption("NLP-based sentiment scoring and VaR adjustment")
                 
                 try:
@@ -1725,17 +1739,17 @@ if mode == "Single Stock":
             st.markdown("#### CSV Downloads")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.download_button("📊 Download Metrics", csv_metrics, f"{ticker}_risk_metrics.csv", "text/csv")
+                st.download_button("Download Metrics", csv_metrics, f"{ticker}_risk_metrics.csv", "text/csv")
             
             with col2:
                 returns_export_df = pd.DataFrame({'Date': rets.index, 'Return': rets.values})
                 csv_returns = returns_export_df.to_csv(index=False)
-                st.download_button("📈 Download Returns", csv_returns, f"{ticker}_returns.csv", "text/csv")
+                st.download_button("Download Returns", csv_returns, f"{ticker}_returns.csv", "text/csv")
             
             with col3:
                 prices_export_df = pd.DataFrame({'Date': prices.index, 'Price': prices.values})
                 csv_prices = prices_export_df.to_csv(index=False)
-                st.download_button("💹 Download Prices", csv_prices, f"{ticker}_prices.csv", "text/csv")
+                st.download_button("Download Prices", csv_prices, f"{ticker}_prices.csv", "text/csv")
             
             # PDF Report Generation
             st.markdown("---")
@@ -1744,7 +1758,7 @@ if mode == "Single Stock":
             if HAS_FEATURES:
                 report_gen = ReportGenerator()
                 if report_gen.is_available():
-                    if st.button("📄 Generate PDF Report", type="primary"):
+                    if st.button("Generate PDF Report", type="primary"):
                         with st.spinner("Generating professional PDF report..."):
                             var_data = {
                                 'var_95': abs(p_var),
@@ -1951,12 +1965,17 @@ else:
         
         if HAS_ENHANCED_UTILS:
             tab_list.append("Rebalancing")
+            tab_list.append("Risk Analytics")  # New v4.4 - Risk Score, Scenarios, Attribution
         
         if enable_digital_twin and HAS_DIGITAL_TWIN:
-            tab_list.append("Digital Twin 🔮")
+            tab_list.append("Digital Twin")
         
         if enable_what_if and HAS_WHAT_IF:
-            tab_list.append("What-If 🎯")
+            tab_list.append("What-If")
+        
+        # Add new Portfolio Builder tabs if available
+        if HAS_PORTFOLIO_BUILDER:
+            tab_list.append("Presets")  # Quick presets
         
         tab_list.extend(["Charts", "Export"])
         
@@ -1968,21 +1987,96 @@ else:
             tab_idx += 1
             st.subheader("Portfolio Risk Summary")
             
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Ann. Return", f"{port_metrics['ann_ret']:.1%}")
-            col2.metric("Ann. Volatility", f"{port_metrics['ann_vol']:.1%}")
-            col3.metric("Max Drawdown", f"{port_metrics['max_dd']:.1%}")
-            col4.metric("Sharpe Ratio", f"{port_metrics['sharpe']:.2f}")
-            
+            # Calculate core metrics first for Risk Score
             port_var = portfolio_var(returns_df, weights_array, conf_level)
             port_hvar = historical_var(port_rets, 1, conf_level)
             port_cvar = cvar(port_rets, conf_level)
             
-            col5, col6, col7, col8 = st.columns(4)
-            col5.metric("Parametric VaR", f"{port_var:.2%}")
-            col6.metric("Historical VaR", f"{port_hvar:.2%}")
-            col7.metric("CVaR", f"{port_cvar:.2%}")
-            col8.metric("Sortino Ratio", f"{port_metrics['sortino']:.2f}")
+            # Risk Score Widget (v4.4)
+            if HAS_ENHANCED_UTILS:
+                # Calculate correlation for risk score
+                corr_matrix = returns_df.corr()
+                avg_corr = (corr_matrix.sum().sum() - len(corr_matrix)) / (len(corr_matrix) ** 2 - len(corr_matrix))
+                
+                risk_score = calculate_unified_risk_score(
+                    var_pct=abs(port_var),
+                    sharpe_ratio=port_metrics['sharpe'],
+                    max_drawdown=port_metrics['max_dd'],
+                    volatility=port_metrics['ann_vol'],
+                    correlation_avg=avg_corr if avg_corr > 0 else 0.3,
+                    sentiment_score=50  # Neutral if no sentiment
+                )
+                
+                # Display Risk Score prominently
+                col_score, col_metrics = st.columns([1, 3])
+                with col_score:
+                    fig_score = create_risk_score_gauge(
+                        risk_score.total_score,
+                        risk_score.grade,
+                        risk_score.color,
+                        "Risk Score"
+                    )
+                    st.plotly_chart(fig_score, use_container_width=True)
+                
+                with col_metrics:
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Ann. Return", f"{port_metrics['ann_ret']:.1%}")
+                    col2.metric("Ann. Volatility", f"{port_metrics['ann_vol']:.1%}")
+                    col3.metric("Max Drawdown", f"{port_metrics['max_dd']:.1%}")
+                    col4.metric("Sharpe Ratio", f"{port_metrics['sharpe']:.2f}")
+                    
+                    col5, col6, col7, col8 = st.columns(4)
+                    col5.metric("Parametric VaR", f"{port_var:.2%}")
+                    col6.metric("Historical VaR", f"{port_hvar:.2%}")
+                    col7.metric("CVaR", f"{port_cvar:.2%}")
+                    col8.metric("Sortino Ratio", f"{port_metrics['sortino']:.2f}")
+                    
+                    # Risk recommendations
+                    if risk_score.recommendations:
+                        with st.expander("Recommendations"):
+                            for rec in risk_score.recommendations:
+                                st.info(rec)
+            else:
+                # Original layout without risk score
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Ann. Return", f"{port_metrics['ann_ret']:.1%}")
+                col2.metric("Ann. Volatility", f"{port_metrics['ann_vol']:.1%}")
+                col3.metric("Max Drawdown", f"{port_metrics['max_dd']:.1%}")
+                col4.metric("Sharpe Ratio", f"{port_metrics['sharpe']:.2f}")
+                
+                col5, col6, col7, col8 = st.columns(4)
+                col5.metric("Parametric VaR", f"{port_var:.2%}")
+                col6.metric("Historical VaR", f"{port_hvar:.2%}")
+                col7.metric("CVaR", f"{port_cvar:.2%}")
+                col8.metric("Sortino Ratio", f"{port_metrics['sortino']:.2f}")
+            
+            st.markdown("---")
+            
+            # Sector Exposure (v4.4)
+            if HAS_ENHANCED_UTILS:
+                weights_dict = {t: weights[t]/100 for t in tickers}
+                sector_exp = analyze_sector_exposure(returns_df, weights_dict)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("#### Sector Allocation")
+                    fig_sector = create_sector_pie_chart(
+                        sector_exp.sector_weights,
+                        sector_exp.sector_risk_contribution,
+                        "Sector Weight vs Risk"
+                    )
+                    st.plotly_chart(fig_sector, use_container_width=True)
+                
+                with col2:
+                    st.markdown("#### Diversification Metrics")
+                    st.metric("Dominant Sector", sector_exp.dominant_sector)
+                    st.metric("Concentration (HHI)", f"{sector_exp.concentration_index:.2%}")
+                    st.metric("Diversification Score", f"{sector_exp.diversification_score:.0%}")
+                    
+                    if sector_exp.diversification_score < 0.5:
+                        st.warning("Consider diversifying across more sectors")
+                    else:
+                        st.success("Good sector diversification")
             
             st.markdown("---")
             st.markdown("#### Individual Asset Metrics")
@@ -2024,7 +2118,8 @@ else:
                 with col1:
                     st.metric("Portfolio Volatility", f"{decomp['portfolio_volatility']:.1%}")
                 with col2:
-                    st.metric("Concentration (HHI)", f"{decomp['concentration']:.0f}")
+                    # HHI ranges 0-10000, convert to 0-100% scale
+                    st.metric("Concentration (HHI)", f"{decomp['concentration']/100:.1f}%")
                 
                 # Risk contribution chart
                 fig_decomp = risk_contribution_chart(
@@ -2146,6 +2241,24 @@ else:
             })
             st.dataframe(opt_weights_df, use_container_width=True, hide_index=True)
             
+            # Apply buttons for quick weight changes
+            apply_col1, apply_col2 = st.columns(2)
+            with apply_col1:
+                if st.button("Apply Optimal Weights", key="apply_optimal"):
+                    st.session_state['loaded_weights'] = {
+                        t: opt_result['weights'][i] * 100 for i, t in enumerate(tickers)
+                    }
+                    st.success("Optimal weights applied! Please re-run Analyze Portfolio.")
+                    st.rerun()
+            with apply_col2:
+                if st.button("Apply Equal Weights", key="apply_equal"):
+                    equal_weight = 100 / len(tickers)
+                    st.session_state['loaded_weights'] = {
+                        t: equal_weight for t in tickers
+                    }
+                    st.success("Equal weights applied! Please re-run Analyze Portfolio.")
+                    st.rerun()
+            
             fig_weights = go.Figure()
             fig_weights.add_trace(go.Bar(name='Current', x=tickers, y=weights_array*100, marker_color=COLORS['gray']))
             fig_weights.add_trace(go.Bar(name='Optimal', x=tickers, y=opt_result['weights']*100, marker_color=COLORS['primary']))
@@ -2209,6 +2322,19 @@ else:
                             title="Risk Contribution by Asset"
                         )
                         st.plotly_chart(fig_rp, use_container_width=True)
+                        
+                        # Store result for apply button
+                        st.session_state['rp_result'] = rp_result
+                
+                # Apply Risk Parity button (outside the calculate block)
+                if 'rp_result' in st.session_state:
+                    if st.button("Apply Risk Parity Weights", key="apply_rp"):
+                        rp_weights = st.session_state['rp_result']['weights']
+                        st.session_state['loaded_weights'] = {
+                            t: rp_weights[t] * 100 for t in rp_weights.keys()
+                        }
+                        st.success("Risk Parity weights applied! Please re-run Analyze Portfolio.")
+                        st.rerun()
                 
                 st.markdown("---")
                 st.markdown("### Black-Litterman Model")
@@ -2252,8 +2378,21 @@ else:
                                 'Posterior': '{:.1f}%',
                                 'Weight': '{:.1f}%'
                             }), use_container_width=True, hide_index=True)
+                            
+                            # Store result for apply button
+                            st.session_state['bl_result'] = bl_result
                         else:
                             st.error("Black-Litterman optimization failed")
+                
+                # Apply Black-Litterman button (outside the calculate block)
+                if 'bl_result' in st.session_state:
+                    if st.button("Apply Black-Litterman Weights", key="apply_bl"):
+                        bl_weights = st.session_state['bl_result']['weights']
+                        st.session_state['loaded_weights'] = {
+                            t: bl_weights[t] * 100 for t in bl_weights.keys()
+                        }
+                        st.success("Black-Litterman weights applied! Please re-run Analyze Portfolio.")
+                        st.rerun()
         
         # TAB: REBALANCING (moved from Enhanced tab)
         if HAS_ENHANCED_UTILS:
@@ -2312,9 +2451,9 @@ else:
                 rebal_result = threshold_rebalancing(drifted_w, target_w, threshold)
                 
                 if rebal_result['needs_rebalance']:
-                    st.warning(f"⚠️ Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
+                    st.warning(f"Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
                 else:
-                    st.success(f"✅ No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
+                    st.success(f"No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
                 
                 # Show drifts
                 drift_df = pd.DataFrame({
@@ -2324,6 +2463,162 @@ else:
                 })
                 st.dataframe(drift_df.style.format({'Drift': '{:.2f}%', 'Threshold': '{:.1f}%'}),
                            use_container_width=True, hide_index=True)
+            
+            # TAB: RISK ANALYTICS (v4.4) - Historical Scenarios, VaR Backtest, Attribution, Network
+            with tabs[tab_idx]:
+                tab_idx += 1
+                st.subheader("Advanced Risk Analytics")
+                
+                # Sub-tabs for different analytics
+                analytics_tabs = st.tabs(["Historical Scenarios", "VaR Backtest", "Performance Attribution", "Correlation Network"])
+                
+                # Historical Scenarios
+                with analytics_tabs[0]:
+                    st.markdown("### Historical Scenario Replay")
+                    st.info("See how your portfolio would have performed during past market crises")
+                    
+                    weights_dict = {t: weights[t]/100 for t in tickers}
+                    
+                    # Replay all scenarios
+                    with st.spinner("Replaying historical scenarios..."):
+                        scenarios = replay_all_scenarios(returns_df, weights_dict)
+                    
+                    if scenarios:
+                        # Impact chart
+                        fig_scenarios = create_scenario_impact_chart(scenarios)
+                        st.plotly_chart(fig_scenarios, use_container_width=True)
+                        
+                        # Details table
+                        st.markdown("#### Scenario Details")
+                        scenario_df = pd.DataFrame([{
+                            'Scenario': s.scenario_name,
+                            'Period': f"{s.start_date} to {s.end_date}",
+                            'Market Return': f"{s.market_return:.1%}",
+                            'Portfolio Return': f"{s.portfolio_return:.1%}",
+                            'Max Drawdown': f"{s.max_drawdown:.1%}",
+                            'Recovery (days)': s.recovery_days,
+                            'Severity': s.severity
+                        } for s in scenarios])
+                        st.dataframe(scenario_df, use_container_width=True, hide_index=True)
+                        
+                        # Worst case summary
+                        worst = min(scenarios, key=lambda x: x.portfolio_return)
+                        st.error(f"Worst Case: {worst.scenario_name} - {worst.portfolio_return:.1%} ({worst.description})")
+                
+                # VaR Backtest
+                with analytics_tabs[1]:
+                    st.markdown("### VaR Model Backtesting")
+                    st.info("Validate VaR model accuracy using historical violations")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        bt_conf = st.selectbox("Confidence Level", [0.95, 0.99, 0.975], key="bt_conf")
+                    with col2:
+                        bt_window = st.selectbox("Lookback Window", [126, 252, 504], format_func=lambda x: f"{x} days", key="bt_window")
+                    
+                    if st.button("Run VaR Backtest", type="primary", key="run_bt"):
+                        with st.spinner("Backtesting VaR models..."):
+                            backtest_results = run_var_backtest(
+                                port_rets, 
+                                conf_level=bt_conf,
+                                methods=['parametric', 'historical', 'ewma'],
+                                window=bt_window
+                            )
+                        
+                        if backtest_results:
+                            # Summary metrics
+                            st.markdown("#### Model Comparison")
+                            bt_df = pd.DataFrame([{
+                                'Model': r.model_name,
+                                'Violations': r.violations,
+                                'Violation Rate': f"{r.violation_rate:.2%}",
+                                'Expected Rate': f"{r.expected_rate:.2%}",
+                                'Kupiec p-value': f"{r.kupiec_pvalue:.4f}",
+                                'Status': 'Adequate' if r.model_adequate else 'Inadequate',
+                                'Assessment': r.assessment
+                            } for r in backtest_results])
+                            st.dataframe(bt_df, use_container_width=True, hide_index=True)
+                            
+                            # Backtest chart for best model
+                            best_model = min(backtest_results, key=lambda x: abs(x.violation_rate - x.expected_rate))
+                            st.markdown(f"#### Best Model: {best_model.model_name}")
+                            fig_bt = create_var_backtest_chart(
+                                best_model.return_series,
+                                best_model.var_series,
+                                f"{best_model.model_name} VaR Backtest"
+                            )
+                            st.plotly_chart(fig_bt, use_container_width=True)
+                
+                # Performance Attribution
+                with analytics_tabs[2]:
+                    st.markdown("### Performance Attribution")
+                    st.info("Decompose portfolio returns into market, factor, and alpha contributions")
+                    
+                    if st.button("Calculate Attribution", type="primary", key="calc_attr"):
+                        with st.spinner("Calculating attribution..."):
+                            weights_dict = {t: weights[t]/100 for t in tickers}
+                            attribution = calculate_performance_attribution(
+                                port_rets,
+                                bench_rets.reindex(port_rets.index).fillna(0),
+                                weights=weights_dict,
+                                asset_returns=returns_df
+                            )
+                        
+                        # Summary metrics
+                        col1, col2, col3, col4 = st.columns(4)
+                        col1.metric("Total Return", f"{attribution.total_return:.1%}")
+                        col2.metric("Market Contribution", f"{attribution.market_contribution:.1%}")
+                        col3.metric("Alpha", f"{attribution.alpha:.1%}")
+                        col4.metric("Residual", f"{attribution.residual:.1%}")
+                        
+                        # Waterfall chart
+                        fig_attr = create_performance_attribution_waterfall({
+                            'total_return': attribution.total_return,
+                            'market_contribution': attribution.market_contribution,
+                            'alpha': attribution.alpha,
+                            'factor_contributions': attribution.factor_contributions,
+                            'residual': attribution.residual
+                        })
+                        st.plotly_chart(fig_attr, use_container_width=True)
+                        
+                        # Brinson attribution
+                        st.markdown("#### Brinson Attribution")
+                        brinson_df = pd.DataFrame({
+                            'Effect': ['Selection', 'Allocation', 'Interaction'],
+                            'Contribution': [
+                                f"{attribution.selection_effect:.2%}",
+                                f"{attribution.allocation_effect:.2%}",
+                                f"{attribution.interaction_effect:.2%}"
+                            ]
+                        })
+                        st.dataframe(brinson_df, use_container_width=True, hide_index=True)
+                
+                # Correlation Network
+                with analytics_tabs[3]:
+                    st.markdown("### Correlation Network Graph")
+                    st.info("Visualize asset relationships - stronger connections indicate higher correlation")
+                    
+                    corr_threshold = st.slider("Correlation Threshold", 0.1, 0.8, 0.4, 0.1, key="corr_thresh")
+                    show_neg = st.checkbox("Show Negative Correlations", value=True, key="show_neg")
+                    
+                    corr_matrix = returns_df.corr()
+                    fig_network = create_correlation_network(
+                        corr_matrix,
+                        threshold=corr_threshold,
+                        show_negative=show_neg
+                    )
+                    st.plotly_chart(fig_network, use_container_width=True)
+                    
+                    # Correlation summary
+                    st.markdown("#### Correlation Summary")
+                    avg_corr = (corr_matrix.sum().sum() - len(corr_matrix)) / (len(corr_matrix) ** 2 - len(corr_matrix))
+                    max_corr = corr_matrix.where(~np.eye(len(corr_matrix), dtype=bool)).max().max()
+                    min_corr = corr_matrix.where(~np.eye(len(corr_matrix), dtype=bool)).min().min()
+                    
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Average Correlation", f"{avg_corr:.2f}")
+                    col2.metric("Max Correlation", f"{max_corr:.2f}")
+                    col3.metric("Min Correlation", f"{min_corr:.2f}")
         
         # TAB: DIGITAL TWIN (v4.3) - if enabled
         if enable_digital_twin and HAS_DIGITAL_TWIN:
@@ -2352,6 +2647,43 @@ else:
                 except Exception as e:
                     st.error(f"What-If Analysis error: {e}")
                     st.info("Check that the What-If analyzer is properly loaded.")
+        
+        # TAB: PRESETS (v4.4) - Quick Portfolio Optimization Presets
+        if HAS_PORTFOLIO_BUILDER:
+            with tabs[tab_idx]:
+                tab_idx += 1
+                st.subheader("Quick Portfolio Presets")
+                
+                # Sub-tabs for Risk Budget, Factor Builder, Presets
+                preset_tabs = st.tabs(["Quick Presets", "Risk Budget", "Factor Builder"])
+                
+                with preset_tabs[0]:
+                    try:
+                        render_presets_tab(
+                            returns=returns_df,
+                            current_weights={t: w for t, w in zip(tickers, weights_array)}
+                        )
+                    except Exception as e:
+                        st.error(f"Presets error: {e}")
+                
+                with preset_tabs[1]:
+                    try:
+                        render_risk_budget_tab(
+                            returns=returns_df,
+                            current_weights={t: w for t, w in zip(tickers, weights_array)},
+                            portfolio_value=100000
+                        )
+                    except Exception as e:
+                        st.error(f"Risk Budget error: {e}")
+                
+                with preset_tabs[2]:
+                    try:
+                        render_factor_builder_tab(
+                            returns=returns_df,
+                            current_weights={t: w for t, w in zip(tickers, weights_array)}
+                        )
+                    except Exception as e:
+                        st.error(f"Factor Builder error: {e}")
         
         # TAB: CHARTS
         with tabs[tab_idx]:
@@ -2410,11 +2742,12 @@ else:
 # FOOTER
 # ============================================================================
 st.markdown("---")
-enhanced_features = " | Enhanced Analytics | Risk Parity | Black-Litterman" if HAS_ENHANCED_UTILS else ""
+enhanced_features = " | Risk Score | Scenarios | Factor Builder" if HAS_ENHANCED_UTILS else ""
+portfolio_builder = " | Presets | Risk Budget" if HAS_PORTFOLIO_BUILDER else ""
 st.markdown(f"""
 <div style='text-align: center; color: #8E8E93; font-size: 0.8rem;'>
-    Stock Risk Model v4.2 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk | TA Signals<br>
-    Options Analytics | Fundamentals | PDF Reports | Alerts{enhanced_features}<br>
+    Stock Risk Model v4.4 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk | TA Signals<br>
+    Options Analytics | Fundamentals | VaR Backtest | Attribution{enhanced_features}{portfolio_builder}<br>
     Built with Streamlit, XGBoost, GARCH, Fama-French | Local Analysis Only
 </div>
 """, unsafe_allow_html=True)

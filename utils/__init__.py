@@ -45,7 +45,11 @@ from .visualization import (
     apply_dark_theme, DARK_THEME,
     enhanced_volatility_surface_3d, volatility_smile_cross_sections,
     term_structure_chart, efficient_frontier_chart,
-    interactive_weight_slider_chart, weight_allocation_chart
+    interactive_weight_slider_chart, weight_allocation_chart,
+    # New in v4.4
+    create_correlation_network, create_var_backtest_chart,
+    create_sector_pie_chart, create_risk_score_gauge,
+    create_scenario_impact_chart, create_performance_attribution_waterfall
 )
 
 from .realtime import (
@@ -53,6 +57,19 @@ from .realtime import (
     PriceStream, RealtimeEngine, MARKET_SCHEDULES,
     WebSocketPriceStream, RealTimePriceAggregator,
     create_realtime_dashboard, display_websocket_status
+)
+
+# New in v4.4 - Enhanced Analytics
+from .analytics_enhanced import (
+    # Data classes
+    RiskScoreResult, ScenarioResult, SectorExposure,
+    PerformanceAttribution, VaRBacktestResult,
+    # Constants
+    HISTORICAL_SCENARIOS, SECTOR_MAP,
+    # Functions
+    calculate_unified_risk_score, replay_historical_scenario,
+    replay_all_scenarios, analyze_sector_exposure,
+    calculate_performance_attribution, run_var_backtest
 )
 
 __all__ = [
@@ -94,11 +111,23 @@ __all__ = [
     'enhanced_volatility_surface_3d', 'volatility_smile_cross_sections',
     'term_structure_chart', 'efficient_frontier_chart',
     'interactive_weight_slider_chart', 'weight_allocation_chart',
+    # New visualization functions
+    'create_correlation_network', 'create_var_backtest_chart',
+    'create_sector_pie_chart', 'create_risk_score_gauge',
+    'create_scenario_impact_chart', 'create_performance_attribution_waterfall',
     
     # Realtime
     'get_live_quote', 'is_market_open', 'calculate_live_pnl',
     'PriceStream', 'RealtimeEngine', 'MARKET_SCHEDULES',
     'WebSocketPriceStream', 'RealTimePriceAggregator',
     'create_realtime_dashboard', 'display_websocket_status',
+    
+    # Enhanced Analytics (v4.4)
+    'RiskScoreResult', 'ScenarioResult', 'SectorExposure',
+    'PerformanceAttribution', 'VaRBacktestResult',
+    'HISTORICAL_SCENARIOS', 'SECTOR_MAP',
+    'calculate_unified_risk_score', 'replay_historical_scenario',
+    'replay_all_scenarios', 'analyze_sector_exposure',
+    'calculate_performance_attribution', 'run_var_backtest',
 ]
 

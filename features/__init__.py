@@ -58,6 +58,34 @@ try:
 except ImportError:
     HAS_WHAT_IF = False
 
+# Portfolio Builder (v4.4) - Risk Budget, Factor Builder, Presets
+try:
+    from .portfolio_builder import (
+        # Data classes
+        RiskBudgetResult,
+        FactorPortfolioResult,
+        WhatIfPreset,
+        FactorType,
+        # Constants
+        WHAT_IF_PRESETS,
+        # Classes
+        RiskBudgetOptimizer,
+        FactorPortfolioBuilder,
+        PresetOptimizer,
+        # Functions
+        estimate_factor_scores,
+        create_risk_budget_chart,
+        create_factor_exposure_radar,
+        create_preset_comparison_chart,
+        # Render functions
+        render_risk_budget_tab,
+        render_factor_builder_tab,
+        render_presets_tab,
+    )
+    HAS_PORTFOLIO_BUILDER = True
+except ImportError:
+    HAS_PORTFOLIO_BUILDER = False
+
 __all__ = [
     'AlertManager', 
     'ReportGenerator', 
@@ -82,5 +110,17 @@ __all__ = [
     'WhatIfScenario',
     'render_what_if_tab',
     'render_scenario_builder',
-    'HAS_WHAT_IF'
+    'HAS_WHAT_IF',
+    # Portfolio Builder (v4.4)
+    'RiskBudgetResult',
+    'FactorPortfolioResult',
+    'WhatIfPreset',
+    'WHAT_IF_PRESETS',
+    'RiskBudgetOptimizer',
+    'FactorPortfolioBuilder',
+    'PresetOptimizer',
+    'render_risk_budget_tab',
+    'render_factor_builder_tab',
+    'render_presets_tab',
+    'HAS_PORTFOLIO_BUILDER',
 ]

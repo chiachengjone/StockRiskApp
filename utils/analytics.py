@@ -674,7 +674,7 @@ def rolling_correlation_breakdown(
         
         if corr_increase > 0.1:
             result['crisis_vs_normal']['interpretation'] = \
-                '⚠️ Correlations increase significantly during crises (diversification breakdown)'
+                'Correlations increase significantly during crises (diversification breakdown)'
         else:
             result['crisis_vs_normal']['interpretation'] = \
                 '✓ Correlations stable during crises (diversification holds)'

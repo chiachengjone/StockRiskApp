@@ -59,3 +59,19 @@ vaderSentiment>=3.3.2
 # Uncomment if you want LSTM capabilities:
 # tensorflow>=2.15.0
 # keras>=3.0.0
+
+# =============================================
+# NEW in v4.4 - Enhanced Analytics & Portfolio Builder
+# =============================================
+
+# Note: All dependencies already covered by scipy, numpy, pandas
+# No additional packages required for v4.4 features:
+# - Risk Score Calculator
+# - Historical Scenario Replay
+# - Sector Exposure Analysis
+# - VaR Backtesting Dashboard
+# - Performance Attribution
+# - Correlation Network Visualization
+# - Risk Budget Optimizer
+# - Factor Portfolio Builder
+# - What-If Presets

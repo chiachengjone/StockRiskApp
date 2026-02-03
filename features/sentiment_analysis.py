@@ -481,7 +481,7 @@ def render_sentiment_tab(
         ticker: Stock symbol
         returns: Historical returns for VaR calculation
     """
-    st.subheader(f"📊 Sentiment Analysis: {ticker}")
+    st.subheader(f"Sentiment Analysis: {ticker}")
     
     # Analyze sentiment
     with st.spinner("Analyzing sentiment..."):
@@ -491,18 +491,18 @@ def render_sentiment_tab(
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        emoji = "🟢" if result.overall_score > 0.2 else "🔴" if result.overall_score < -0.2 else "🟡"
+        label_text = "Positive" if result.overall_score > 0.2 else "Negative" if result.overall_score < -0.2 else "Neutral"
         st.metric(
             "Sentiment",
-            f"{emoji} {result.overall_label.value.replace('_', ' ').title()}"
+            f"{result.overall_label.value.replace('_', ' ').title()}"
         )
     
     with col2:
         st.metric("Score", f"{result.overall_score:.3f}")
     
     with col3:
-        trend_icon = "📈" if result.trending_score > 0 else "📉" if result.trending_score < 0 else "➡️"
-        st.metric("Trend", f"{trend_icon} {result.trending_score:+.3f}")
+        trend_text = "Up" if result.trending_score > 0 else "Down" if result.trending_score < 0 else "Flat"
+        st.metric("Trend", f"{trend_text} {result.trending_score:+.3f}")
     
     with col4:
         adj_pct = (result.sentiment_var_adjustment - 1) * 100
@@ -517,10 +517,10 @@ def render_sentiment_tab(
     
     # Main content
     tab1, tab2, tab3, tab4 = st.tabs([
-        "📈 Sentiment Overview",
-        "📰 News Feed",
-        "🐋 Whale Tracking",
-        "⚠️ Sentiment VaR"
+        "Sentiment Overview",
+        "News Feed",
+        "Whale Tracking",
+        "Sentiment VaR"
     ])
     
     with tab1:
@@ -554,20 +554,20 @@ def render_sentiment_tab(
             for article in result.articles[:10]:
                 # Sentiment indicator
                 if article.sentiment_score > 0.2:
-                    emoji = "🟢"
+                    sentiment_label = "[+]"
                     bg_color = "rgba(0, 200, 83, 0.1)"
                 elif article.sentiment_score < -0.2:
-                    emoji = "🔴"
+                    sentiment_label = "[-]"
                     bg_color = "rgba(213, 0, 0, 0.1)"
                 else:
-                    emoji = "🟡"
+                    sentiment_label = "[o]"
                     bg_color = "rgba(158, 158, 158, 0.1)"
                 
                 with st.container():
                     col1, col2 = st.columns([10, 2])
                     
                     with col1:
-                        st.markdown(f"**{emoji} {article.title}**")
+                        st.markdown(f"**{sentiment_label} {article.title}**")
                         st.caption(
                             f"Source: {article.source} • "
                             f"Score: {article.sentiment_score:.2f} • "
@@ -583,7 +583,7 @@ def render_sentiment_tab(
             st.info("No recent news articles found")
     
     with tab3:
-        st.subheader("🐋 Whale & Insider Activity")
+        st.subheader("Whale & Insider Activity")
         
         col1, col2 = st.columns([1, 1])
         
@@ -592,17 +592,14 @@ def render_sentiment_tab(
             whale_score = result.whale_activity_score
             if whale_score > 0.3:
                 whale_label = "Bullish Accumulation"
-                whale_emoji = "🟢"
             elif whale_score < -0.3:
                 whale_label = "Distribution"
-                whale_emoji = "🔴"
             else:
                 whale_label = "Neutral"
-                whale_emoji = "🟡"
             
             st.metric(
                 "Whale Activity Score",
-                f"{whale_emoji} {whale_label}",
+                f"{whale_label}",
                 delta=f"{whale_score:+.2f}"
             )
         
@@ -628,7 +625,7 @@ def render_sentiment_tab(
             st.dataframe(pd.DataFrame(activity_data), use_container_width=True)
     
     with tab4:
-        st.subheader("⚠️ Sentiment-Adjusted VaR")
+        st.subheader("Sentiment-Adjusted VaR")
         
         if returns is not None and len(returns) > 50:
             # Calculate Sentiment VaR
@@ -698,7 +695,7 @@ def render_portfolio_sentiment(
         tickers: List of portfolio tickers
         weights: Optional portfolio weights
     """
-    st.subheader("📊 Portfolio Sentiment")
+    st.subheader("Portfolio Sentiment")
     
     with st.spinner("Analyzing portfolio sentiment..."):
         portfolio_result = service.analyze_portfolio(tickers, weights)
@@ -708,8 +705,8 @@ def render_portfolio_sentiment(
     
     with col1:
         score = portfolio_result['portfolio_sentiment']
-        emoji = "🟢" if score > 0.2 else "🔴" if score < -0.2 else "🟡"
-        st.metric("Portfolio Sentiment", f"{emoji} {score:.3f}")
+        label = "Positive" if score > 0.2 else "Negative" if score < -0.2 else "Neutral"
+        st.metric("Portfolio Sentiment", f"{label} ({score:.3f})")
     
     with col2:
         st.metric(
@@ -741,22 +738,22 @@ def render_portfolio_sentiment(
             score = sentiment_data.get('overall_score', 0)
             label = sentiment_data.get('overall_label', 'neutral')
             
-            emoji = "🟢" if score > 0.2 else "🔴" if score < -0.2 else "🟡"
+            indicator = "[+]" if score > 0.2 else "[-]" if score < -0.2 else "[o]"
             
             st.markdown(f"**{ticker}**")
-            st.caption(f"{emoji} {label.replace('_', ' ').title()}")
+            st.caption(f"{indicator} {label.replace('_', ' ').title()}")
             st.progress((score + 1) / 2)  # Normalize to 0-1
     
     # Top news
-    st.subheader("📰 Top Portfolio News")
+    st.subheader("Top Portfolio News")
     
     articles = portfolio_result.get('top_articles', [])
     if articles:
         for article in articles[:5]:
-            emoji = "🟢" if article.get('sentiment_score', 0) > 0.2 else "🔴" if article.get('sentiment_score', 0) < -0.2 else "🟡"
+            indicator = "[+]" if article.get('sentiment_score', 0) > 0.2 else "[-]" if article.get('sentiment_score', 0) < -0.2 else "[o]"
             tickers_str = ", ".join(article.get('tickers', [])[:3])
             
-            st.markdown(f"{emoji} **{article.get('title', '')}**")
+            st.markdown(f"{indicator} **{article.get('title', '')}**")
             st.caption(f"Tickers: {tickers_str} • Score: {article.get('sentiment_score', 0):.2f}")
             st.divider()
 
@@ -768,16 +765,34 @@ def render_portfolio_sentiment(
 def create_sentiment_service_from_config() -> Optional['SentimentService']:
     """Create SentimentService from environment configuration."""
     import os
+    from pathlib import Path
+    
+    # Ensure dotenv is loaded
+    try:
+        from dotenv import load_dotenv
+        env_path = Path(__file__).parent.parent / '.env'
+        load_dotenv(env_path)
+    except ImportError:
+        pass
     
     try:
         from services.sentiment_service import SentimentService
         
+        alpaca_key = os.getenv('ALPACA_API_KEY', '')
+        alpaca_secret = os.getenv('ALPACA_API_SECRET', '')
+        polygon_key = os.getenv('POLYGON_API_KEY', '')
+        
+        # Debug logging
+        if not alpaca_key and not polygon_key:
+            logger.warning("No API keys found for sentiment news fetching")
+        
         return SentimentService(
-            polygon_key=os.getenv('POLYGON_API_KEY', ''),
-            alpaca_key=os.getenv('ALPACA_API_KEY', ''),
-            alpaca_secret=os.getenv('ALPACA_API_SECRET', '')
+            polygon_key=polygon_key,
+            alpaca_key=alpaca_key,
+            alpaca_secret=alpaca_secret
         )
-    except ImportError:
+    except ImportError as e:
+        logger.error(f"Failed to import SentimentService: {e}")
         return None
 
 

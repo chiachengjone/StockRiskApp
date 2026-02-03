@@ -341,7 +341,7 @@ def handle_missing_data(
             pct = missing / len(prices) * 100
             report['missing_by_column'][col] = {'count': missing, 'pct': pct}
             if warn and pct > 5:
-                st.warning(f"⚠️ {col}: {pct:.1f}% missing data")
+                st.warning(f"{col}: {pct:.1f}% missing data")
     
     # Apply filling strategy
     if method == 'ffill':
@@ -416,7 +416,7 @@ def detect_outliers(
     outlier_info['outliers'] = list(outliers.values)
     
     if show_details and len(outliers) > 0:
-        st.warning(f"⚠️ {len(outliers)} outlier(s) detected:")
+        st.warning(f"{len(outliers)} outlier(s) detected:")
         for date, ret in outliers.head(5).items():
             st.caption(f"  {date.strftime('%Y-%m-%d')}: {ret:.2%}")
         if len(outliers) > 5:
@@ -533,10 +533,10 @@ def check_data_freshness(data: pd.DataFrame) -> Dict[str, Any]:
         result['message'] = f"Data is {days_old} days old (weekends/holidays)"
     elif days_old <= 7:
         result['status'] = 'stale'
-        result['message'] = f"⚠️ Data is {days_old} days old"
+        result['message'] = f"Data is {days_old} days old"
     else:
         result['status'] = 'old'
-        result['message'] = f"⚠️ Data is {days_old} days old - may be outdated"
+        result['message'] = f"Data is {days_old} days old - may be outdated"
     
     return result
 

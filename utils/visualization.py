@@ -1554,6 +1554,469 @@ def weight_allocation_chart(
     return apply_dark_theme(fig)
 
 
+# =============================================================================
+# CORRELATION NETWORK GRAPH
+# =============================================================================
+
+def create_correlation_network(
+    corr_matrix: pd.DataFrame,
+    threshold: float = 0.5,
+    title: str = "Asset Correlation Network",
+    show_negative: bool = True
+) -> go.Figure:
+    """
+    Create interactive network graph showing asset correlations.
+    
+    Assets are nodes, correlations above threshold are edges.
+    Edge thickness represents correlation strength.
+    
+    Args:
+        corr_matrix: Correlation matrix DataFrame
+        threshold: Minimum absolute correlation to show edge
+        title: Chart title
+        show_negative: Show negative correlations (red edges)
+    
+    Returns:
+        Plotly figure with network visualization
+    """
+    n_assets = len(corr_matrix)
+    assets = list(corr_matrix.columns)
+    
+    # Calculate node positions using circular layout
+    angles = np.linspace(0, 2 * np.pi, n_assets, endpoint=False)
+    radius = 1.0
+    node_x = radius * np.cos(angles)
+    node_y = radius * np.sin(angles)
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add edges (correlations)
+    edge_traces = []
+    for i in range(n_assets):
+        for j in range(i + 1, n_assets):
+            corr = corr_matrix.iloc[i, j]
+            
+            if abs(corr) >= threshold:
+                # Determine edge color and width
+                if corr > 0:
+                    edge_color = f'rgba(0, 200, 83, {min(1, abs(corr))})'  # Green
+                else:
+                    if not show_negative:
+                        continue
+                    edge_color = f'rgba(255, 23, 68, {min(1, abs(corr))})'  # Red
+                
+                edge_width = abs(corr) * 5  # Scale width by correlation
+                
+                fig.add_trace(go.Scatter(
+                    x=[node_x[i], node_x[j]],
+                    y=[node_y[i], node_y[j]],
+                    mode='lines',
+                    line=dict(width=edge_width, color=edge_color),
+                    hoverinfo='text',
+                    hovertext=f"{assets[i]} - {assets[j]}: {corr:.3f}",
+                    showlegend=False
+                ))
+    
+    # Calculate node sizes based on average correlation strength
+    avg_correlations = []
+    for i in range(n_assets):
+        avg_corr = corr_matrix.iloc[i].drop(assets[i]).abs().mean()
+        avg_correlations.append(avg_corr)
+    
+    # Normalize sizes
+    min_size = 20
+    max_size = 50
+    if max(avg_correlations) > min(avg_correlations):
+        sizes = [
+            min_size + (c - min(avg_correlations)) / 
+            (max(avg_correlations) - min(avg_correlations)) * (max_size - min_size)
+            for c in avg_correlations
+        ]
+    else:
+        sizes = [35] * n_assets
+    
+    # Add nodes
+    fig.add_trace(go.Scatter(
+        x=node_x,
+        y=node_y,
+        mode='markers+text',
+        marker=dict(
+            size=sizes,
+            color=avg_correlations,
+            colorscale='Viridis',
+            colorbar=dict(title='Avg Corr', x=1.02),
+            line=dict(width=2, color='white')
+        ),
+        text=assets,
+        textposition='top center',
+        textfont=dict(size=12, color='white'),
+        hovertemplate='<b>%{text}</b><br>Avg Correlation: %{marker.color:.3f}<extra></extra>'
+    ))
+    
+    # Layout
+    fig.update_layout(
+        title=dict(text=title, x=0.5, font=dict(size=16)),
+        showlegend=False,
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        height=600,
+        hovermode='closest',
+        annotations=[
+            dict(
+                text=f"Threshold: {threshold:.0%}",
+                x=0.02, y=0.98,
+                xref='paper', yref='paper',
+                showarrow=False,
+                font=dict(size=10, color='gray')
+            )
+        ]
+    )
+    
+    return apply_dark_theme(fig)
+
+
+def create_var_backtest_chart(
+    returns: pd.Series,
+    var_series: pd.Series,
+    title: str = "VaR Backtesting Timeline"
+) -> go.Figure:
+    """
+    Create VaR backtesting visualization showing returns vs VaR.
+    
+    Highlights violations where actual returns exceeded VaR estimate.
+    
+    Args:
+        returns: Actual return series
+        var_series: VaR estimates (negative values)
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    # Align data
+    common_idx = returns.index.intersection(var_series.index)
+    aligned_returns = returns.loc[common_idx]
+    aligned_var = var_series.loc[common_idx]
+    
+    # Find violations
+    violations = aligned_returns < aligned_var
+    
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.1,
+        row_heights=[0.7, 0.3],
+        subplot_titles=('Returns vs VaR', 'Cumulative Violations')
+    )
+    
+    # Returns as bars
+    colors = ['#FF1744' if v else '#2196F3' for v in violations]
+    
+    fig.add_trace(
+        go.Bar(
+            x=aligned_returns.index,
+            y=aligned_returns.values * 100,
+            marker_color=colors,
+            name='Daily Returns',
+            hovertemplate='%{x}<br>Return: %{y:.2f}%<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    
+    # VaR line
+    fig.add_trace(
+        go.Scatter(
+            x=aligned_var.index,
+            y=aligned_var.values * 100,
+            mode='lines',
+            line=dict(color='#FFC107', width=2, dash='dash'),
+            name='VaR Threshold',
+            hovertemplate='VaR: %{y:.2f}%<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    
+    # Cumulative violations
+    cumulative_violations = violations.cumsum()
+    
+    fig.add_trace(
+        go.Scatter(
+            x=cumulative_violations.index,
+            y=cumulative_violations.values,
+            mode='lines',
+            fill='tozeroy',
+            fillcolor='rgba(255, 23, 68, 0.3)',
+            line=dict(color='#FF1744', width=2),
+            name='Cumulative Violations'
+        ),
+        row=2, col=1
+    )
+    
+    # Expected violations line
+    expected_rate = 0.05  # 95% confidence
+    expected_violations = np.arange(len(cumulative_violations)) * expected_rate
+    
+    fig.add_trace(
+        go.Scatter(
+            x=cumulative_violations.index,
+            y=expected_violations,
+            mode='lines',
+            line=dict(color='#FFC107', width=2, dash='dot'),
+            name='Expected (5%)'
+        ),
+        row=2, col=1
+    )
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        height=600,
+        showlegend=True,
+        legend=dict(orientation='h', yanchor='bottom', y=1.02)
+    )
+    
+    fig.update_yaxes(title_text='Return (%)', row=1, col=1)
+    fig.update_yaxes(title_text='Violations', row=2, col=1)
+    
+    return apply_dark_theme(fig)
+
+
+def create_sector_pie_chart(
+    sector_weights: Dict[str, float],
+    sector_risk: Dict[str, float] = None,
+    title: str = "Sector Allocation"
+) -> go.Figure:
+    """
+    Create sector allocation pie chart with optional risk overlay.
+    
+    Args:
+        sector_weights: Dict of sector -> weight
+        sector_risk: Optional dict of sector -> risk contribution
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    sectors = list(sector_weights.keys())
+    weights = [v * 100 for v in sector_weights.values()]
+    
+    if sector_risk:
+        fig = make_subplots(
+            rows=1, cols=2,
+            specs=[[{"type": "pie"}, {"type": "pie"}]],
+            subplot_titles=('Weight Allocation', 'Risk Contribution')
+        )
+        
+        # Weight pie
+        fig.add_trace(
+            go.Pie(
+                labels=sectors,
+                values=weights,
+                hole=0.4,
+                textinfo='label+percent',
+                textposition='outside',
+                marker=dict(colors=px.colors.qualitative.Set2)
+            ),
+            row=1, col=1
+        )
+        
+        # Risk pie
+        risk_values = [sector_risk.get(s, 0) * 100 for s in sectors]
+        fig.add_trace(
+            go.Pie(
+                labels=sectors,
+                values=risk_values,
+                hole=0.4,
+                textinfo='label+percent',
+                textposition='outside',
+                marker=dict(colors=px.colors.qualitative.Set2)
+            ),
+            row=1, col=2
+        )
+        
+        fig.update_layout(height=450)
+    else:
+        fig = go.Figure(
+            go.Pie(
+                labels=sectors,
+                values=weights,
+                hole=0.4,
+                textinfo='label+percent',
+                textposition='outside',
+                marker=dict(colors=px.colors.qualitative.Set2)
+            )
+        )
+        fig.update_layout(height=400)
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        showlegend=True,
+        legend=dict(orientation='h', yanchor='bottom', y=-0.1)
+    )
+    
+    return apply_dark_theme(fig)
+
+
+def create_risk_score_gauge(
+    score: float,
+    grade: str,
+    color: str,
+    title: str = "Portfolio Risk Score"
+) -> go.Figure:
+    """
+    Create risk score gauge visualization.
+    
+    Args:
+        score: Risk score 0-100
+        grade: Letter grade (A-F)
+        color: Color for the gauge
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number+delta",
+        value=score,
+        number={'suffix': f' ({grade})', 'font': {'size': 40}},
+        title={'text': title, 'font': {'size': 16}},
+        gauge={
+            'axis': {'range': [0, 100], 'tickwidth': 1},
+            'bar': {'color': color},
+            'bgcolor': 'rgba(0,0,0,0)',
+            'borderwidth': 2,
+            'bordercolor': 'gray',
+            'steps': [
+                {'range': [0, 20], 'color': '#E8F5E9'},
+                {'range': [20, 40], 'color': '#C8E6C9'},
+                {'range': [40, 60], 'color': '#FFF9C4'},
+                {'range': [60, 80], 'color': '#FFECB3'},
+                {'range': [80, 100], 'color': '#FFCDD2'}
+            ],
+            'threshold': {
+                'line': {'color': 'red', 'width': 4},
+                'thickness': 0.75,
+                'value': 80
+            }
+        }
+    ))
+    
+    fig.update_layout(
+        height=300,
+        margin=dict(l=20, r=20, t=50, b=20)
+    )
+    
+    return apply_dark_theme(fig)
+
+
+def create_scenario_impact_chart(
+    scenarios: list,
+    title: str = "Historical Scenario Impact"
+) -> go.Figure:
+    """
+    Create bar chart showing portfolio impact under historical scenarios.
+    
+    Args:
+        scenarios: List of ScenarioResult objects
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    names = [s.scenario_name for s in scenarios]
+    returns = [s.portfolio_return * 100 for s in scenarios]
+    severities = [s.severity for s in scenarios]
+    
+    # Color by severity
+    severity_colors = {
+        'Low': '#4CAF50',
+        'Medium': '#FFC107',
+        'High': '#FF9800',
+        'Extreme': '#FF1744'
+    }
+    colors = [severity_colors.get(s, '#2196F3') for s in severities]
+    
+    fig = go.Figure(go.Bar(
+        y=names,
+        x=returns,
+        orientation='h',
+        marker_color=colors,
+        text=[f'{r:.1f}%' for r in returns],
+        textposition='outside',
+        hovertemplate='<b>%{y}</b><br>Impact: %{x:.1f}%<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        xaxis_title='Portfolio Return (%)',
+        yaxis=dict(categoryorder='total ascending'),
+        height=max(400, len(scenarios) * 40),
+        margin=dict(l=200)
+    )
+    
+    # Add vertical line at 0
+    fig.add_vline(x=0, line_dash='dash', line_color='gray')
+    
+    return apply_dark_theme(fig)
+
+
+def create_performance_attribution_waterfall(
+    attribution: dict,
+    title: str = "Performance Attribution"
+) -> go.Figure:
+    """
+    Create waterfall chart for performance attribution.
+    
+    Args:
+        attribution: PerformanceAttribution dict
+        title: Chart title
+    
+    Returns:
+        Plotly figure
+    """
+    labels = ['Total Return', 'Market', 'Alpha']
+    values = [
+        attribution.get('total_return', 0) * 100,
+        attribution.get('market_contribution', 0) * 100,
+        attribution.get('alpha', 0) * 100
+    ]
+    
+    # Add factor contributions
+    factors = attribution.get('factor_contributions', {})
+    for factor, contrib in factors.items():
+        labels.append(factor)
+        values.append(contrib * 100)
+    
+    # Add residual
+    labels.append('Residual')
+    values.append(attribution.get('residual', 0) * 100)
+    
+    # Determine measure types
+    measures = ['total'] + ['relative'] * (len(labels) - 1)
+    
+    fig = go.Figure(go.Waterfall(
+        orientation='v',
+        measure=measures,
+        x=labels,
+        y=values,
+        textposition='outside',
+        text=[f'{v:.2f}%' for v in values],
+        connector={'line': {'color': 'rgb(63, 63, 63)'}},
+        increasing={'marker': {'color': '#00C853'}},
+        decreasing={'marker': {'color': '#FF1744'}},
+        totals={'marker': {'color': '#2196F3'}}
+    ))
+    
+    fig.update_layout(
+        title=dict(text=title, x=0.5),
+        yaxis_title='Contribution (%)',
+        height=450,
+        showlegend=False
+    )
+    
+    return apply_dark_theme(fig)
+
+
 class VisualizationEngine:
     """
     Unified interface for all visualization features.
