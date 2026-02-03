@@ -349,6 +349,32 @@ with st.sidebar:
         else:
             st.info("🔴 Market Closed")
     
+    # Data Source Display
+    st.divider()
+    st.markdown("### 📡 Data Source")
+    
+    # Get active data source info
+    try:
+        from config.settings import get_active_data_source, DATA_SOURCES
+        source_info = get_active_data_source()
+        
+        st.metric("Source", source_info['display_name'])
+        st.caption(f"Type: {source_info['type']}")
+        st.success("✅ Connected")
+        
+        # Show available sources count
+        enabled_count = sum(1 for s in DATA_SOURCES.values() if s.get('enabled', False) or s.get('api_key'))
+        if enabled_count > 1:
+            st.caption(f"📊 {enabled_count} sources available")
+    except ImportError:
+        st.metric("Source", "Yahoo Finance")
+        st.caption("Type: Free API")
+        st.success("✅ Connected")
+    except Exception:
+        st.metric("Source", "Yahoo Finance")
+        st.caption("Type: Free API")
+        st.success("✅ Connected")
+    
     # ML Model Status
     st.divider()
     ml_test = MLPredictor()
@@ -357,39 +383,35 @@ with st.sidebar:
     else:
         st.warning("⚡ Using GradientBoosting\n(XGBoost unavailable)")
     
-    # New Feature Toggles (v4.3)
-    st.divider()
-    st.markdown("### 🆕 New Features")
-    
-    # Sentiment Analysis Toggle
-    enable_sentiment = False
-    if HAS_SENTIMENT_FEATURE and HAS_SENTIMENT:
-        enable_sentiment = st.toggle("🧠 Sentiment Analysis", value=False,
-                                     help="NLP-based sentiment scoring and VaR adjustment")
-    
-    # Digital Twin Toggle
-    enable_digital_twin = False
-    if HAS_DIGITAL_TWIN:
-        enable_digital_twin = st.toggle("🔮 Digital Twin", value=False,
-                                        help="Portfolio scenario simulation and comparison")
-    
-    # What-If Toggle
-    enable_what_if = False
-    if HAS_WHAT_IF:
-        enable_what_if = st.toggle("🎯 What-If Analysis", value=False,
-                                   help="Interactive portfolio weight adjustment")
-    
-    # Real-time WebSocket Toggle
-    enable_websocket = False
-    if HAS_ENHANCED_UTILS:
-        enable_websocket = st.toggle("⚡ Real-time WebSocket", value=False,
-                                     help="Sub-second price updates via WebSocket")
+    # New Features (v4.3) - All enabled by default when available
+    # Features are automatically enabled if the modules are available
+    enable_sentiment = HAS_SENTIMENT_FEATURE and HAS_SENTIMENT
+    enable_digital_twin = HAS_DIGITAL_TWIN
+    enable_what_if = HAS_WHAT_IF
+    enable_websocket = HAS_ENHANCED_UTILS
     
     # Store in session state
     st.session_state.enable_sentiment = enable_sentiment
     st.session_state.enable_digital_twin = enable_digital_twin
     st.session_state.enable_what_if = enable_what_if
     st.session_state.enable_websocket = enable_websocket
+    
+    # Show active features
+    st.divider()
+    st.markdown("### 📊 Active Features")
+    features_active = []
+    if enable_sentiment:
+        features_active.append("🧠 Sentiment")
+    if enable_digital_twin:
+        features_active.append("🔮 Digital Twin")
+    if enable_what_if:
+        features_active.append("🎯 What-If")
+    if enable_websocket:
+        features_active.append("⚡ WebSocket")
+    if features_active:
+        st.success(" | ".join(features_active))
+    else:
+        st.info("Install optional modules for more features")
     
     st.divider()
     
@@ -632,13 +654,14 @@ if mode == "Single Stock":
     with col3:
         days_back = st.slider("Days Back", 100, 2000, 756)
 
-    col4, col5, col6 = st.columns(3)
+    col4, col5 = st.columns(2)
     with col4:
         conf_level = st.slider("Confidence Level", 0.90, 0.999, 0.95, 0.01)
     with col5:
         var_horizon = st.slider("VaR Horizon (days)", 1, 30, 1)
-    with col6:
-        advanced_mode = st.toggle("Advanced Analysis")
+    
+    # Advanced Analysis is always enabled
+    advanced_mode = True
 
     if 'single_analyzed' not in st.session_state:
         st.session_state.single_analyzed = False
@@ -712,27 +735,22 @@ if mode == "Single Stock":
         h_var = historical_var(rets, var_horizon, conf_level)
         cv = cvar(rets, conf_level)
         
-        # Define tabs - include Enhanced and new features if available
+        # Define tabs - include Sentiment if available (Enhanced features now integrated elsewhere)
         enable_sentiment = st.session_state.get('enable_sentiment', False)
         
-        if HAS_ENHANCED_UTILS and enable_sentiment and HAS_SENTIMENT_FEATURE:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
-                "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
-                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Enhanced ✨", "Sentiment 🧠", "Export"
-            ])
-        elif HAS_ENHANCED_UTILS:
+        if enable_sentiment and HAS_SENTIMENT_FEATURE:
             tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
                 "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
-                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Enhanced ✨", "Export"
+                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Sentiment 🧠", "Export"
             ])
-            tab12 = None
+            export_tab = tab11
         else:
             tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
                 "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
                 "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Export"
             ])
             tab11 = None
-            tab12 = None
+            export_tab = tab10
         
         # TAB 1: OVERVIEW
         with tab1:
@@ -805,6 +823,36 @@ if mode == "Single Stock":
                                       template='plotly_dark' if theme_dark else 'plotly_white',
                                       yaxis_title="Sharpe Ratio")
                 st.plotly_chart(fig_rsh, use_container_width=True)
+            
+            # Real-time Market Data Section
+            if HAS_ENHANCED_UTILS:
+                st.markdown("---")
+                st.markdown("#### Real-time Market Data")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    market_status = is_market_open()
+                    if market_status.get('is_open', False):
+                        st.success("🟢 Market is OPEN")
+                    else:
+                        st.warning("🔴 Market is CLOSED")
+                
+                with col2:
+                    if st.button("Refresh Quote", key="overview_refresh"):
+                        st.rerun()
+                
+                # Live quote
+                live = get_live_quote(ticker)
+                if live and live.get('price'):
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Live Price", f"${live['price']:.2f}")
+                    change_val = live.get('change', 0) or 0
+                    change_pct = live.get('change_pct', 0) or 0
+                    col2.metric("Change", f"${change_val:.2f}", delta=f"{change_pct:.2f}%")
+                    col3.metric("Volume", f"{live['volume']:,.0f}" if live.get('volume') else "N/A")
+                    col4.metric("Day Range", f"${live['low']:.2f} - ${live['high']:.2f}" if live.get('low') and live.get('high') else "N/A")
+                    
+                    st.caption(f"Last updated: {live.get('last_updated', 'Unknown')}")
         
         # TAB 2: VAR ANALYSIS
         with tab2:
@@ -844,6 +892,58 @@ if mode == "Single Stock":
                               annotation_text="1% VaR")
                 fig2.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=350)
                 st.plotly_chart(fig2, use_container_width=True)
+            
+            # VaR Backtesting Section
+            if HAS_ENHANCED_UTILS:
+                st.markdown("---")
+                st.markdown("### VaR Model Backtesting")
+                st.info("Test how well VaR models predicted actual losses using Kupiec and Christoffersen tests.")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    bt_confidence = st.selectbox("Backtest Confidence Level", [0.95, 0.99], index=0, key="var_bt_conf")
+                with col2:
+                    bt_window = st.slider("Lookback Window", 60, 252, 126, key="var_bt_window")
+                
+                if st.button("Run VaR Backtest", type="primary", key="run_var_backtest"):
+                    with st.spinner("Running VaR backtest..."):
+                        # Calculate VaR series
+                        var_series = rets.rolling(bt_window).apply(
+                            lambda x: np.percentile(x, (1 - bt_confidence) * 100)
+                        )
+                        
+                        # Kupiec test
+                        kupiec = backtest_var_kupiec(rets, var_series, bt_confidence)
+                        
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Violations", kupiec['violations'])
+                        col2.metric("Expected Rate", f"{kupiec['expected_rate']*100:.1f}%")
+                        col3.metric("P-Value", f"{kupiec['p_value']:.4f}")
+                        
+                        # Check if model passed (p-value >= 0.05 means we fail to reject H0)
+                        if kupiec['p_value'] >= 0.05:
+                            st.success(f"✅ VaR model PASSED Kupiec test at {bt_confidence:.0%} confidence")
+                        else:
+                            st.error(f"❌ VaR model FAILED Kupiec test - model may be miscalibrated")
+                        
+                        # Show violations chart
+                        fig_bt = go.Figure()
+                        fig_bt.add_trace(go.Scatter(
+                            x=rets.index, y=rets.values * 100,
+                            mode='lines', name='Returns', line=dict(color='#2196F3', width=1)
+                        ))
+                        fig_bt.add_trace(go.Scatter(
+                            x=var_series.index, y=var_series.values * 100,
+                            mode='lines', name=f'VaR {bt_confidence:.0%}', 
+                            line=dict(color='#FF5722', width=2, dash='dash')
+                        ))
+                        fig_bt.update_layout(
+                            title="Returns vs VaR Threshold",
+                            xaxis_title="Date", yaxis_title="Return (%)",
+                            template='plotly_dark' if theme_dark else 'plotly_white',
+                            height=400
+                        )
+                        st.plotly_chart(fig_bt, use_container_width=True)
         
         # TAB 3: MONTE CARLO
         with tab3:
@@ -943,65 +1043,144 @@ if mode == "Single Stock":
         with tab5:
             st.subheader("Advanced Risk Models")
             
-            if advanced_mode:
-                st.markdown("### GARCH(1,1) Volatility Model")
-                garch_fitted, garch_cond_vol, garch_forecast = fit_garch(rets)
-                
-                if garch_fitted is not None:
-                    col1, col2, col3 = st.columns(3)
-                    current_garch_vol = float(garch_cond_vol.iloc[-1]) * np.sqrt(252)
-                    col1.metric("Current GARCH Vol", f"{current_garch_vol:.1%}")
-                    col2.metric("10-Day Forecast", f"{garch_forecast[-1]:.1%}")
-                    vol_regime = "High" if current_garch_vol > metrics['ann_vol'] * 1.2 else "Normal"
-                    col3.metric("Vol Regime", vol_regime)
-                    
-                    # GARCH volatility chart
-                    fig_garch = go.Figure()
-                    fig_garch.add_trace(go.Scatter(
-                        x=garch_cond_vol.index, 
-                        y=garch_cond_vol.values * np.sqrt(252) * 100,
-                        name='GARCH Volatility',
-                        line=dict(color=COLORS['primary'], width=1.5)
-                    ))
-                    fig_garch.update_layout(
-                        title="GARCH Conditional Volatility (Annualized)",
-                        yaxis_title="Volatility (%)",
-                        template='plotly_dark' if theme_dark else 'plotly_white',
-                        height=300
-                    )
-                    st.plotly_chart(fig_garch, use_container_width=True)
-                
-                st.markdown("---")
-                st.markdown("### EVT Tail Risk (Extreme Value Theory)")
-                evt_results = evt_tail_risk(rets)
-                if "error" not in evt_results:
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Tail Threshold", f"{evt_results['threshold']:.2%}")
-                    col2.metric("GPD Shape Parameter", f"{evt_results['shape']:.3f}", help="Shape > 0 indicates heavy tails")
-                    col3.metric("EVT 99% VaR", f"{evt_results['evt_var']:.2%}")
-                else:
-                    st.info(evt_results["error"])
-                
-                st.markdown("---")
-                st.markdown("### Backtest: Buy & Hold vs Benchmark")
-                bt_results = backtest_strategy(rets, bench_rets)
-                
+            # GARCH Model (always shown - advanced mode is always enabled)
+            st.markdown("### GARCH(1,1) Volatility Model")
+            garch_fitted, garch_cond_vol, garch_forecast = fit_garch(rets)
+            
+            if garch_fitted is not None:
                 col1, col2, col3 = st.columns(3)
-                col1.metric(f"{ticker} Total Return", f"{bt_results['strategy_return']:.1%}")
-                col2.metric(f"{benchmark} Return", f"{bt_results['benchmark_return']:.1%}")
-                col3.metric("Excess Return", f"{bt_results['excess_return']:.1%}")
+                current_garch_vol = float(garch_cond_vol.iloc[-1]) * np.sqrt(252)
+                col1.metric("Current GARCH Vol", f"{current_garch_vol:.1%}")
+                col2.metric("10-Day Forecast", f"{garch_forecast[-1]:.1%}")
+                vol_regime = "High" if current_garch_vol > metrics['ann_vol'] * 1.2 else "Normal"
+                col3.metric("Vol Regime", vol_regime)
                 
-                # Cumulative returns chart
-                fig_bt = go.Figure()
-                fig_bt.add_trace(go.Scatter(x=bt_results['strategy_cum'].index, y=bt_results['strategy_cum'].values,
-                                           name=ticker, line=dict(color=COLORS['primary'], width=2)))
-                fig_bt.add_trace(go.Scatter(x=bt_results['benchmark_cum'].index, y=bt_results['benchmark_cum'].values,
-                                           name=benchmark, line=dict(color=COLORS['gray'], width=2, dash='dash')))
-                fig_bt.update_layout(title="Cumulative Returns Comparison", 
-                                    template='plotly_dark' if theme_dark else 'plotly_white', height=350)
-                st.plotly_chart(fig_bt, use_container_width=True)
+                # GARCH volatility chart
+                fig_garch = go.Figure()
+                fig_garch.add_trace(go.Scatter(
+                    x=garch_cond_vol.index, 
+                    y=garch_cond_vol.values * np.sqrt(252) * 100,
+                    name='GARCH Volatility',
+                    line=dict(color=COLORS['primary'], width=1.5)
+                ))
+                fig_garch.update_layout(
+                    title="GARCH Conditional Volatility (Annualized)",
+                    yaxis_title="Volatility (%)",
+                    template='plotly_dark' if theme_dark else 'plotly_white',
+                    height=300
+                )
+                st.plotly_chart(fig_garch, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("### EVT Tail Risk (Extreme Value Theory)")
+            evt_results = evt_tail_risk(rets)
+            if "error" not in evt_results:
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Tail Threshold", f"{evt_results['threshold']:.2%}")
+                col2.metric("GPD Shape Parameter", f"{evt_results['shape']:.3f}", help="Shape > 0 indicates heavy tails")
+                col3.metric("EVT 99% VaR", f"{evt_results['evt_var']:.2%}")
             else:
-                st.info("Enable 'Advanced Analysis' toggle to access GARCH, EVT, and Backtesting")
+                st.info(evt_results["error"])
+            
+            st.markdown("---")
+            st.markdown("### Backtest: Buy & Hold vs Benchmark")
+            bt_results = backtest_strategy(rets, bench_rets)
+            
+            col1, col2, col3 = st.columns(3)
+            col1.metric(f"{ticker} Total Return", f"{bt_results['strategy_return']:.1%}")
+            col2.metric(f"{benchmark} Return", f"{bt_results['benchmark_return']:.1%}")
+            col3.metric("Excess Return", f"{bt_results['excess_return']:.1%}")
+            
+            # Cumulative returns chart
+            fig_bt = go.Figure()
+            fig_bt.add_trace(go.Scatter(x=bt_results['strategy_cum'].index, y=bt_results['strategy_cum'].values,
+                                       name=ticker, line=dict(color=COLORS['primary'], width=2)))
+            fig_bt.add_trace(go.Scatter(x=bt_results['benchmark_cum'].index, y=bt_results['benchmark_cum'].values,
+                                       name=benchmark, line=dict(color=COLORS['gray'], width=2, dash='dash')))
+            fig_bt.update_layout(title="Cumulative Returns Comparison", 
+                                template='plotly_dark' if theme_dark else 'plotly_white', height=350)
+            st.plotly_chart(fig_bt, use_container_width=True)
+            
+            # Regime Detection Section
+            if HAS_ENHANCED_UTILS:
+                st.markdown("---")
+                st.markdown("### Market Regime Detection")
+                st.info("Identify Bull, Bear, and Sideways market regimes using Gaussian Mixture Models.")
+                
+                n_regimes = st.slider("Number of Regimes", 2, 4, 3, key="regime_n")
+                
+                if st.button("Detect Regimes", type="primary", key="detect_regimes"):
+                    with st.spinner("Detecting market regimes..."):
+                        regime_result = regime_detection(rets, n_regimes=n_regimes)
+                        
+                        if 'error' not in regime_result:
+                            st.success(f"Detected {regime_result['n_regimes']} regimes")
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Current Regime", regime_result['current_regime'])
+                            with col2:
+                                current_label = regime_result['current_regime']
+                                if 'Bull' in str(current_label):
+                                    st.success("🟢 Bullish Environment")
+                                elif 'Bear' in str(current_label):
+                                    st.error("🔴 Bearish Environment")
+                                else:
+                                    st.info("🟡 Neutral/Sideways")
+                            
+                            # Regime statistics
+                            st.markdown("#### Regime Statistics")
+                            stats_df = pd.DataFrame(regime_result['regime_characteristics']).T
+                            st.dataframe(stats_df, use_container_width=True)
+                            
+                            # Regime chart
+                            regime_series = regime_result['regime_series']
+                            fig_regime = regime_chart(prices, regime_series, title=f"{ticker} Price with Regime Overlay")
+                            st.plotly_chart(fig_regime, use_container_width=True)
+                        else:
+                            st.error(regime_result['error'])
+            
+            # Advanced Visualizations Section
+            if HAS_ENHANCED_UTILS:
+                st.markdown("---")
+                st.markdown("### Advanced Visualizations")
+                
+                viz_type = st.selectbox(
+                    "Select Visualization",
+                    ["VaR Cone Projection", "Rolling Performance", "Cumulative Returns Comparison"],
+                    key="adv_viz_type"
+                )
+                
+                if viz_type == "VaR Cone Projection":
+                    horizon = st.slider("Projection Horizon (days)", 10, 90, 30, key="var_cone_horizon")
+                    fig_cone = var_cone_chart(rets, horizon=horizon, title=f"{ticker} VaR Cone Projection")
+                    st.plotly_chart(fig_cone, use_container_width=True)
+                    
+                elif viz_type == "Rolling Performance":
+                    metric = st.selectbox("Metric", ["sharpe", "volatility", "return", "sortino"], key="rolling_metric")
+                    fig_roll = rolling_performance_chart(rets, metric=metric, title=f"{ticker} Rolling {metric.title()}")
+                    st.plotly_chart(fig_roll, use_container_width=True)
+                    
+                elif viz_type == "Cumulative Returns Comparison":
+                    # Compare with benchmark
+                    combined = pd.DataFrame({ticker: rets, benchmark: bench_rets})
+                    fig_cum = cumulative_returns_chart(combined, title="Cumulative Returns Comparison")
+                    st.plotly_chart(fig_cum, use_container_width=True)
+                
+                # Download chart option
+                st.markdown("---")
+                if st.button("📥 Download Chart as HTML", key="download_adv_chart"):
+                    if viz_type == "VaR Cone Projection":
+                        html = make_chart_downloadable(fig_cone)
+                    elif viz_type == "Rolling Performance":
+                        html = make_chart_downloadable(fig_roll)
+                    else:
+                        html = make_chart_downloadable(fig_cum)
+                    st.download_button(
+                        "Download", html, 
+                        f"{ticker}_chart.html", "text/html",
+                        key="download_html"
+                    )
         
         # TAB 6: FACTORS
         with tab6:
@@ -1149,6 +1328,49 @@ if mode == "Single Stock":
                 col1.metric("Training Samples", ml_results.get('n_train', 'N/A'))
                 col2.metric("Test Samples", ml_results.get('n_test', 'N/A'))
                 col3.metric("Top Feature", ml_results.get('top_features', ['N/A'])[0])
+                
+                # Ensemble Predictions Section
+                if HAS_ENHANCED_UTILS:
+                    st.markdown("---")
+                    st.markdown("### Ensemble VaR Predictions")
+                    
+                    ml_check = MLPredictor()
+                    ml_model_name = "XGBoost" if ml_check.model_type == 'xgboost' else "GradientBoosting"
+                    st.info(f"Combine multiple models ({ml_model_name}, GARCH, Historical, Parametric, EWMA) for robust VaR estimates.")
+                    
+                    if st.button("Generate Ensemble Prediction", type="primary", key="ensemble_pred"):
+                        with st.spinner("Running ensemble models..."):
+                            ml_ensemble = MLPredictor()
+                            ensemble = ml_ensemble.ensemble_predict(rets, prices)
+                            
+                            if 'error' not in ensemble:
+                                # Show which model was used
+                                st.success(f"✅ Ensemble complete using {ml_ensemble.model_type.replace('_', ' ').title()}")
+                                
+                                col1, col2, col3 = st.columns(3)
+                                col1.metric("Ensemble VaR", f"{ensemble['ensemble_var']:.2%}")
+                                col2.metric("Model Spread", f"{ensemble['spread']:.2%}")
+                                col3.metric("Models Used", ensemble['n_models'])
+                                
+                                # Individual predictions chart
+                                fig_ens = var_comparison_chart(
+                                    ensemble['individual_predictions'],
+                                    title="VaR by Model"
+                                )
+                                st.plotly_chart(fig_ens, use_container_width=True)
+                                
+                                # Confidence intervals
+                                st.markdown("#### Bootstrap Confidence Intervals")
+                                with st.spinner("Calculating confidence intervals..."):
+                                    ci_result = ml_ensemble.predict_with_confidence(rets, prices, n_bootstrap=50)
+                                    
+                                    if 'error' not in ci_result:
+                                        col1, col2, col3 = st.columns(3)
+                                        col1.metric("Mean VaR", f"{ci_result['mean_var']:.2%}")
+                                        col2.metric("95% CI Lower", f"{ci_result['ci_5']:.2%}")
+                                        col3.metric("95% CI Upper", f"{ci_result['ci_95']:.2%}")
+                            else:
+                                st.error(ensemble.get('error', 'Ensemble prediction failed'))
             else:
                 st.error(ml_results.get('error', 'ML prediction failed'))
                 st.info("Ensure XGBoost is installed: pip install xgboost")
@@ -1243,36 +1465,115 @@ if mode == "Single Stock":
                 )
                 st.plotly_chart(fig_payoff, use_container_width=True)
                 
-                # Strategy Analysis
+                # Strategy Analysis - Show all 3 strategies
                 st.markdown("---")
                 st.markdown("#### Strategy Analysis")
                 
-                strategy = st.selectbox("Select Strategy", 
-                                       ["Covered Call", "Protective Put", "Straddle"])
+                # Calculate all strategies
+                cc = options.covered_call_analysis(current_price, strike, T, rf_option, vol_input)
+                pp = options.protective_put_analysis(current_price, strike, T, rf_option, vol_input)
+                strad = options.straddle_analysis(current_price, current_price, T, rf_option, vol_input)
                 
-                if strategy == "Covered Call":
-                    cc = options.covered_call_analysis(current_price, strike, T, rf_option, vol_input)
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Premium Received", f"${cc['premium_received']:.2f}")
-                    col2.metric("Max Profit", f"${cc['max_profit']:.2f}")
-                    col3.metric("Breakeven", f"${cc['breakeven']:.2f}")
-                    st.caption(f"Return if called: {cc['return_if_called']:.1%} annualized")
+                # Show all 3 strategy panels
+                col1, col2, col3 = st.columns(3)
                 
-                elif strategy == "Protective Put":
-                    pp = options.protective_put_analysis(current_price, strike, T, rf_option, vol_input)
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Put Premium", f"${pp['premium_paid']:.2f}")
-                    col2.metric("Max Loss", f"${pp['max_loss']:.2f}")
-                    col3.metric("Protection Level", f"${pp['protection_level']:.2f}")
+                with col1:
+                    st.markdown("##### 📈 Covered Call")
+                    st.metric("Premium Received", f"${cc['premium_received']:.2f}")
+                    st.metric("Max Profit", f"${cc['max_profit']:.2f}")
+                    st.metric("Breakeven", f"${cc['breakeven']:.2f}")
+                    st.caption(f"Return if called: {cc['return_if_called']:.1%} ann.")
+                
+                with col2:
+                    st.markdown("##### 🛡️ Protective Put")
+                    st.metric("Put Premium", f"${pp['premium_paid']:.2f}")
+                    st.metric("Max Loss", f"${pp['max_loss']:.2f}")
+                    st.metric("Protection Level", f"${pp['protection_level']:.2f}")
                     st.caption(f"Cost of protection: {pp['cost_of_protection']:.2%}")
                 
-                elif strategy == "Straddle":
-                    strad = options.straddle_analysis(current_price, current_price, T, rf_option, vol_input)
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Total Cost", f"${strad['total_cost']:.2f}")
-                    col2.metric("Upper Breakeven", f"${strad['upper_breakeven']:.2f}")
-                    col3.metric("Lower Breakeven", f"${strad['lower_breakeven']:.2f}")
-                    st.caption(f"Required move to breakeven: {strad['required_move']:.1%}")
+                with col3:
+                    st.markdown("##### 📊 Straddle")
+                    st.metric("Total Cost", f"${strad['total_cost']:.2f}")
+                    st.metric("Upper Breakeven", f"${strad['upper_breakeven']:.2f}")
+                    st.metric("Lower Breakeven", f"${strad['lower_breakeven']:.2f}")
+                    st.caption(f"Required move: {strad['required_move']:.1%}")
+                
+                # Show payoff diagrams for all 3 strategies
+                st.markdown("---")
+                st.markdown("#### Strategy Payoff Diagrams")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Covered Call payoff
+                    cc_prices = np.linspace(current_price * 0.7, current_price * 1.3, 100)
+                    cc_payoffs = []
+                    for p in cc_prices:
+                        # Stock gain/loss + premium - (loss if called)
+                        stock_pnl = p - current_price
+                        if p > strike:
+                            payoff = (strike - current_price) + cc['premium_received']
+                        else:
+                            payoff = stock_pnl + cc['premium_received']
+                        cc_payoffs.append(payoff)
+                    
+                    fig_cc = go.Figure()
+                    fig_cc.add_trace(go.Scatter(x=cc_prices, y=cc_payoffs, name='P/L',
+                                                line=dict(color=COLORS['success'], width=2),
+                                                fill='tozeroy', fillcolor='rgba(52, 199, 89, 0.1)'))
+                    fig_cc.add_hline(y=0, line_color=COLORS['gray'], line_width=1)
+                    fig_cc.add_vline(x=current_price, line_dash="dash", line_color=COLORS['warning'])
+                    fig_cc.update_layout(title="Covered Call", height=250,
+                                        template='plotly_dark' if theme_dark else 'plotly_white',
+                                        xaxis_title="Stock Price ($)", yaxis_title="P/L ($)",
+                                        showlegend=False, margin=dict(t=40, b=40, l=40, r=20))
+                    st.plotly_chart(fig_cc, use_container_width=True)
+                
+                with col2:
+                    # Protective Put payoff
+                    pp_prices = np.linspace(current_price * 0.7, current_price * 1.3, 100)
+                    pp_payoffs = []
+                    for p in pp_prices:
+                        stock_pnl = p - current_price
+                        if p < strike:
+                            payoff = (strike - current_price) - pp['premium_paid']
+                        else:
+                            payoff = stock_pnl - pp['premium_paid']
+                        pp_payoffs.append(payoff)
+                    
+                    fig_pp = go.Figure()
+                    fig_pp.add_trace(go.Scatter(x=pp_prices, y=pp_payoffs, name='P/L',
+                                                line=dict(color=COLORS['primary'], width=2),
+                                                fill='tozeroy', fillcolor='rgba(0, 122, 255, 0.1)'))
+                    fig_pp.add_hline(y=0, line_color=COLORS['gray'], line_width=1)
+                    fig_pp.add_vline(x=current_price, line_dash="dash", line_color=COLORS['warning'])
+                    fig_pp.update_layout(title="Protective Put", height=250,
+                                        template='plotly_dark' if theme_dark else 'plotly_white',
+                                        xaxis_title="Stock Price ($)", yaxis_title="P/L ($)",
+                                        showlegend=False, margin=dict(t=40, b=40, l=40, r=20))
+                    st.plotly_chart(fig_pp, use_container_width=True)
+                
+                with col3:
+                    # Straddle payoff
+                    strad_prices = np.linspace(current_price * 0.7, current_price * 1.3, 100)
+                    strad_payoffs = []
+                    for p in strad_prices:
+                        call_payoff = max(0, p - current_price)
+                        put_payoff = max(0, current_price - p)
+                        payoff = call_payoff + put_payoff - strad['total_cost']
+                        strad_payoffs.append(payoff)
+                    
+                    fig_strad = go.Figure()
+                    fig_strad.add_trace(go.Scatter(x=strad_prices, y=strad_payoffs, name='P/L',
+                                                   line=dict(color=COLORS['secondary'], width=2),
+                                                   fill='tozeroy', fillcolor='rgba(88, 86, 214, 0.1)'))
+                    fig_strad.add_hline(y=0, line_color=COLORS['gray'], line_width=1)
+                    fig_strad.add_vline(x=current_price, line_dash="dash", line_color=COLORS['warning'])
+                    fig_strad.update_layout(title="Straddle", height=250,
+                                           template='plotly_dark' if theme_dark else 'plotly_white',
+                                           xaxis_title="Stock Price ($)", yaxis_title="P/L ($)",
+                                           showlegend=False, margin=dict(t=40, b=40, l=40, r=20))
+                    st.plotly_chart(fig_strad, use_container_width=True)
             else:
                 st.info("Options analytics module not available. Check installation.")
         
@@ -1379,238 +1680,23 @@ if mode == "Single Stock":
             else:
                 st.info("Fundamental analysis requires company info data")
         
-        # TAB 10: ENHANCED ANALYTICS (v4.1)
-        if HAS_ENHANCED_UTILS and tab11 is not None:
+        # TAB 10: SENTIMENT ANALYSIS (v4.3) - if enabled
+        if tab11 is not None and st.session_state.get('enable_sentiment', False):
             with tab10:
-                st.subheader("Enhanced Analytics ✨")
-                st.caption("Advanced risk analysis powered by v4.1 enhancements")
+                st.subheader("Sentiment Analysis 🧠")
+                st.caption("NLP-based sentiment scoring and VaR adjustment")
                 
-                enhanced_subtab = st.radio(
-                    "Select Analysis",
-                    ["📊 VaR Backtesting", "🔄 Regime Detection", "📈 Ensemble Predictions", 
-                     "⏱️ Real-time Data", "📉 Advanced Visualizations"],
-                    horizontal=True
-                )
-                
-                st.markdown("---")
-                
-                if enhanced_subtab == "📊 VaR Backtesting":
-                    st.markdown("### VaR Model Backtesting")
-                    st.info("Test how well VaR models predicted actual losses using Kupiec and Christoffersen tests.")
+                try:
+                    # Create returns DataFrame for sentiment analysis
+                    returns_df = pd.DataFrame({ticker: rets})
+                    weights = {ticker: 1.0}
                     
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        bt_confidence = st.selectbox("Confidence Level", [0.95, 0.99], index=0)
-                    with col2:
-                        bt_window = st.slider("Lookback Window", 60, 252, 126)
+                    # Render sentiment tab
+                    render_sentiment_tab(ticker, returns_df)
                     
-                    if st.button("Run Backtest", type="primary"):
-                        with st.spinner("Running VaR backtest..."):
-                            # Calculate VaR series
-                            var_series = rets.rolling(bt_window).apply(
-                                lambda x: np.percentile(x, (1 - bt_confidence) * 100)
-                            )
-                            
-                            # Kupiec test
-                            kupiec = backtest_var_kupiec(rets, var_series, bt_confidence)
-                            
-                            col1, col2, col3 = st.columns(3)
-                            col1.metric("Violations", kupiec['violations'])
-                            col2.metric("Expected Rate", f"{kupiec['expected_rate']*100:.1f}%")
-                            col3.metric("P-Value", f"{kupiec['p_value']:.4f}")
-                            
-                            # Check if model passed (p-value >= 0.05 means we fail to reject H0)
-                            if kupiec['p_value'] >= 0.05:
-                                st.success(f"✅ VaR model PASSED Kupiec test at {bt_confidence:.0%} confidence")
-                            else:
-                                st.error(f"❌ VaR model FAILED Kupiec test - model may be miscalibrated")
-                            
-                            # Show violations chart
-                            fig = go.Figure()
-                            fig.add_trace(go.Scatter(
-                                x=rets.index, y=rets.values * 100,
-                                mode='lines', name='Returns', line=dict(color='#2196F3', width=1)
-                            ))
-                            fig.add_trace(go.Scatter(
-                                x=var_series.index, y=var_series.values * 100,
-                                mode='lines', name=f'VaR {bt_confidence:.0%}', 
-                                line=dict(color='#FF5722', width=2, dash='dash')
-                            ))
-                            fig.update_layout(
-                                title="Returns vs VaR Threshold",
-                                xaxis_title="Date", yaxis_title="Return (%)",
-                                template='plotly_dark' if theme_dark else 'plotly_white',
-                                height=400
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                
-                elif enhanced_subtab == "🔄 Regime Detection":
-                    st.markdown("### Market Regime Detection")
-                    st.info("Identify Bull, Bear, and Sideways market regimes using Gaussian Mixture Models.")
-                    
-                    n_regimes = st.slider("Number of Regimes", 2, 4, 3)
-                    
-                    if st.button("Detect Regimes", type="primary"):
-                        with st.spinner("Detecting market regimes..."):
-                            regime_result = regime_detection(rets, n_regimes=n_regimes)
-                            
-                            if 'error' not in regime_result:
-                                st.success(f"Detected {regime_result['n_regimes']} regimes")
-                                
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.metric("Current Regime", regime_result['current_regime'])
-                                with col2:
-                                    current_label = regime_result['current_regime']
-                                    if 'Bull' in str(current_label):
-                                        st.success("🟢 Bullish Environment")
-                                    elif 'Bear' in str(current_label):
-                                        st.error("🔴 Bearish Environment")
-                                    else:
-                                        st.info("🟡 Neutral/Sideways")
-                                
-                                # Regime statistics
-                                st.markdown("#### Regime Statistics")
-                                stats_df = pd.DataFrame(regime_result['regime_characteristics']).T
-                                st.dataframe(stats_df, use_container_width=True)
-                                
-                                # Regime chart
-                                regime_series = regime_result['regime_series']
-                                fig = regime_chart(prices, regime_series, title=f"{ticker} Price with Regime Overlay")
-                                st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.error(regime_result['error'])
-                
-                elif enhanced_subtab == "📈 Ensemble Predictions":
-                    st.markdown("### Ensemble VaR Predictions")
-                    
-                    # Show which ML model is available
-                    ml_check = MLPredictor()
-                    ml_model_name = "XGBoost" if ml_check.model_type == 'xgboost' else "GradientBoosting"
-                    st.info(f"Combine multiple models ({ml_model_name}, GARCH, Historical, Parametric, EWMA) for robust VaR estimates.")
-                    
-                    if st.button("Generate Ensemble Prediction", type="primary"):
-                        with st.spinner("Running ensemble models..."):
-                            ml = MLPredictor()
-                            ensemble = ml.ensemble_predict(rets, prices)
-                            
-                            if 'error' not in ensemble:
-                                # Show which model was used
-                                st.success(f"✅ Ensemble complete using {ml.model_type.replace('_', ' ').title()}")
-                                
-                                col1, col2, col3 = st.columns(3)
-                                col1.metric("Ensemble VaR", f"{ensemble['ensemble_var']:.2%}")
-                                col2.metric("Model Spread", f"{ensemble['spread']:.2%}")
-                                col3.metric("Models Used", ensemble['n_models'])
-                                
-                                # Individual predictions chart
-                                fig = var_comparison_chart(
-                                    ensemble['individual_predictions'],
-                                    title="VaR by Model"
-                                )
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Confidence intervals
-                                st.markdown("#### Bootstrap Confidence Intervals")
-                                with st.spinner("Calculating confidence intervals..."):
-                                    ci_result = ml.predict_with_confidence(rets, prices, n_bootstrap=50)
-                                    
-                                    if 'error' not in ci_result:
-                                        col1, col2, col3 = st.columns(3)
-                                        col1.metric("Mean VaR", f"{ci_result['mean_var']:.2%}")
-                                        col2.metric("95% CI Lower", f"{ci_result['ci_5']:.2%}")
-                                        col3.metric("95% CI Upper", f"{ci_result['ci_95']:.2%}")
-                            else:
-                                st.error(ensemble.get('error', 'Ensemble prediction failed'))
-                
-                elif enhanced_subtab == "⏱️ Real-time Data":
-                    st.markdown("### Real-time Market Data")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        market_status = is_market_open()
-                        if market_status.get('is_open', False):
-                            st.success("🟢 Market is OPEN")
-                        else:
-                            st.warning("🔴 Market is CLOSED")
-                    
-                    with col2:
-                        if st.button("Refresh Quote"):
-                            st.rerun()
-                    
-                    # Live quote
-                    live = get_live_quote(ticker)
-                    if live and live.get('price'):
-                        st.markdown(f"### {ticker} Live Quote")
-                        col1, col2, col3, col4 = st.columns(4)
-                        col1.metric("Price", f"${live['price']:.2f}")
-                        change_val = live.get('change', 0) or 0
-                        change_pct = live.get('change_pct', 0) or 0
-                        col2.metric("Change", f"${change_val:.2f}", delta=f"{change_pct:.2f}%")
-                        col3.metric("Volume", f"{live['volume']:,.0f}" if live.get('volume') else "N/A")
-                        col4.metric("Day Range", f"${live['low']:.2f} - ${live['high']:.2f}" if live.get('low') and live.get('high') else "N/A")
-                        
-                        st.caption(f"Last updated: {live.get('last_updated', 'Unknown')}")
-                    else:
-                        st.info("Live quote not available")
-                
-                elif enhanced_subtab == "📉 Advanced Visualizations":
-                    st.markdown("### Advanced Visualizations")
-                    
-                    viz_type = st.selectbox(
-                        "Select Visualization",
-                        ["VaR Cone Projection", "Rolling Performance", "Cumulative Returns"]
-                    )
-                    
-                    if viz_type == "VaR Cone Projection":
-                        horizon = st.slider("Projection Horizon (days)", 10, 90, 30)
-                        fig = var_cone_chart(rets, horizon=horizon, title=f"{ticker} VaR Cone Projection")
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                    elif viz_type == "Rolling Performance":
-                        metric = st.selectbox("Metric", ["sharpe", "volatility", "return", "sortino"])
-                        fig = rolling_performance_chart(rets, metric=metric, title=f"{ticker} Rolling {metric.title()}")
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                    elif viz_type == "Cumulative Returns":
-                        # Compare with benchmark
-                        combined = pd.DataFrame({ticker: rets, benchmark: bench_rets})
-                        fig = cumulative_returns_chart(combined, title="Cumulative Returns Comparison")
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Download chart
-                    st.markdown("---")
-                    if st.button("📥 Download Chart as HTML"):
-                        html = make_chart_downloadable(fig)
-                        st.download_button(
-                            "Download", html, 
-                            f"{ticker}_chart.html", "text/html"
-                        )
-            
-            # TAB 11: SENTIMENT ANALYSIS (v4.3)
-            if tab12 is not None and st.session_state.get('enable_sentiment', False):
-                with tab11:
-                    st.subheader("Sentiment Analysis 🧠")
-                    st.caption("NLP-based sentiment scoring and VaR adjustment")
-                    
-                    try:
-                        # Create returns DataFrame for sentiment analysis
-                        returns_df = pd.DataFrame({ticker: rets})
-                        weights = {ticker: 1.0}
-                        
-                        # Render sentiment tab
-                        render_sentiment_tab(ticker, returns_df)
-                        
-                    except Exception as e:
-                        st.error(f"Sentiment analysis error: {e}")
-                        st.info("Make sure TextBlob and/or VADER are installed.")
-                
-                # Update export tab reference
-                export_tab = tab12
-            elif HAS_ENHANCED_UTILS and tab11 is not None:
-                export_tab = tab11
-            else:
-                export_tab = tab10
+                except Exception as e:
+                    st.error(f"Sentiment analysis error: {e}")
+                    st.info("Make sure TextBlob and/or VADER are installed.")
         
         with export_tab:
             st.subheader("Export Data & Reports")
@@ -1853,14 +1939,14 @@ else:
         prices_df = st.session_state.port_prices_df
         weights = st.session_state.port_weights
         
-        # Define tabs - include Enhanced and new features if available
+        # Define tabs - include new features if available (Enhanced features now integrated elsewhere)
         enable_digital_twin = st.session_state.get('enable_digital_twin', False)
         enable_what_if = st.session_state.get('enable_what_if', False)
         
         tab_list = ["Summary", "Monte Carlo", "Correlation", "Stress Test", "Optimization"]
         
         if HAS_ENHANCED_UTILS:
-            tab_list.append("Enhanced ✨")
+            tab_list.append("Rebalancing")
         
         if enable_digital_twin and HAS_DIGITAL_TWIN:
             tab_list.append("Digital Twin 🔮")
@@ -1920,6 +2006,42 @@ else:
                                 color_discrete_sequence=px.colors.sequential.Blues_r)
             fig_contrib.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=350)
             st.plotly_chart(fig_contrib, use_container_width=True)
+            
+            # Risk Decomposition Section
+            if HAS_ENHANCED_UTILS:
+                st.markdown("---")
+                st.markdown("#### Detailed Risk Decomposition")
+                st.info("Understand how each asset contributes to total portfolio risk.")
+                
+                weights_dict = {t: weights[t]/100 for t in tickers}
+                decomp = portfolio_risk_decomposition(weights_dict, returns_df)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Portfolio Volatility", f"{decomp['portfolio_volatility']:.1%}")
+                with col2:
+                    st.metric("Concentration (HHI)", f"{decomp['concentration']:.0f}")
+                
+                # Risk contribution chart
+                fig_decomp = risk_contribution_chart(
+                    decomp['pct_contributions'],
+                    title="Risk Contribution (%)"
+                )
+                st.plotly_chart(fig_decomp, use_container_width=True)
+                
+                # Detailed breakdown
+                st.markdown("##### Detailed Breakdown")
+                decomp_df = pd.DataFrame({
+                    'Asset': list(decomp['risk_contributions'].keys()),
+                    'Risk Contribution': list(decomp['risk_contributions'].values()),
+                    '% of Total': list(decomp['pct_contributions'].values()),
+                    'Marginal Contribution': list(decomp['marginal_contributions'].values())
+                })
+                st.dataframe(decomp_df.style.format({
+                    'Risk Contribution': '{:.4f}',
+                    '% of Total': '{:.1f}%',
+                    'Marginal Contribution': '{:.4f}'
+                }), use_container_width=True, hide_index=True)
         
         # TAB 2: MONTE CARLO (NEW FOR PORTFOLIO)
         with tabs[tab_idx]:
@@ -2035,211 +2157,169 @@ else:
                 fig_ef.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=350,
                                     xaxis_title='Volatility', yaxis_title='Expected Return')
                 st.plotly_chart(fig_ef, use_container_width=True)
+            
+            # Risk Parity and Black-Litterman sections (moved from Enhanced tab)
+            if HAS_ENHANCED_UTILS:
+                st.markdown("---")
+                st.markdown("### Risk Parity Optimization")
+                st.info("Allocate capital so each asset contributes equally to portfolio risk.")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    target_vol = st.slider("Target Volatility", 0.05, 0.30, 0.15, 0.01, key="rp_target_vol")
+                with col2:
+                    max_weight = st.slider("Max Weight per Asset", 0.20, 0.60, 0.40, 0.05, key="rp_max_weight")
+                
+                if st.button("Calculate Risk Parity", type="primary", key="calc_rp"):
+                    with st.spinner("Optimizing..."):
+                        rp_result = risk_parity_weights(
+                            returns_df, 
+                            target_risk=target_vol,
+                            max_weight=max_weight
+                        )
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Portfolio Volatility", f"{rp_result['portfolio_volatility']:.1%}")
+                            st.metric("Diversification Ratio", f"{rp_result['diversification_ratio']:.2f}")
+                        with col2:
+                            st.metric("Leverage for Target", f"{rp_result['leverage_for_target']:.2f}x")
+                        
+                        # Weights comparison
+                        st.markdown("#### Risk Parity Weights")
+                        rp_df = pd.DataFrame({
+                            'Asset': list(rp_result['weights'].keys()),
+                            'Current Weight': [weights.get(t, 0) for t in rp_result['weights'].keys()],
+                            'Risk Parity Weight': [v * 100 for v in rp_result['weights'].values()],
+                            'Risk Contribution': [v * 100 for v in rp_result['risk_contributions'].values()]
+                        })
+                        st.dataframe(rp_df.style.format({
+                            'Current Weight': '{:.1f}%',
+                            'Risk Parity Weight': '{:.1f}%',
+                            'Risk Contribution': '{:.1f}%'
+                        }), use_container_width=True, hide_index=True)
+                        
+                        # Risk contribution chart
+                        fig_rp = risk_contribution_chart(
+                            rp_result['risk_contributions'],
+                            title="Risk Contribution by Asset"
+                        )
+                        st.plotly_chart(fig_rp, use_container_width=True)
+                
+                st.markdown("---")
+                st.markdown("### Black-Litterman Model")
+                st.info("Combine market equilibrium with your investment views.")
+                
+                st.markdown("#### Define Your Views")
+                st.caption("Express views on expected returns (e.g., 'AAPL will outperform by 5%')")
+                
+                # Simple view input
+                view_asset = st.selectbox("Asset with View", tickers, key="bl_view_asset")
+                view_return = st.slider("Expected Annual Return", -0.20, 0.50, 0.10, 0.01, key="bl_view_return")
+                
+                views = [{'asset': view_asset, 'return': view_return}]
+                
+                # Placeholder market caps (equal weight assumed)
+                market_caps = {t: 1e9 for t in tickers}
+                
+                if st.button("Run Black-Litterman", type="primary", key="run_bl"):
+                    with st.spinner("Optimizing with views..."):
+                        bl_result = black_litterman_optimization(
+                            returns_df, market_caps, views
+                        )
+                        
+                        if 'error' not in bl_result:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Expected Return", f"{bl_result['portfolio_return']:.1%}")
+                            with col2:
+                                st.metric("Portfolio Volatility", f"{bl_result['portfolio_volatility']:.1%}")
+                            
+                            # Show adjusted returns
+                            st.markdown("#### Posterior Expected Returns")
+                            ret_df = pd.DataFrame({
+                                'Asset': list(bl_result['expected_returns'].keys()),
+                                'Equilibrium': [v*100 for v in bl_result['equilibrium_returns'].values()],
+                                'Posterior': [v*100 for v in bl_result['expected_returns'].values()],
+                                'Weight': [v*100 for v in bl_result['weights'].values()]
+                            })
+                            st.dataframe(ret_df.style.format({
+                                'Equilibrium': '{:.1f}%',
+                                'Posterior': '{:.1f}%',
+                                'Weight': '{:.1f}%'
+                            }), use_container_width=True, hide_index=True)
+                        else:
+                            st.error("Black-Litterman optimization failed")
         
-        # TAB: ENHANCED PORTFOLIO ANALYTICS (v4.1)
+        # TAB: REBALANCING (moved from Enhanced tab)
         if HAS_ENHANCED_UTILS:
             with tabs[tab_idx]:
                 tab_idx += 1
-                st.subheader("Enhanced Portfolio Analytics ✨")
-                st.caption("Advanced portfolio optimization powered by v4.1 enhancements")
+                st.subheader("Rebalancing Analysis")
                 
-                port_enhanced_subtab = st.radio(
-                    "Select Analysis",
-                    ["⚖️ Risk Parity", "📊 Black-Litterman", "💰 Transaction Costs", 
-                     "🔄 Rebalancing", "📈 Risk Decomposition"],
-                    horizontal=True,
-                    key="port_enhanced_subtab"
-                )
+                # Transaction Costs Section
+                st.markdown("### Transaction Cost Analysis")
+                st.info("Estimate costs of rebalancing to target weights.")
+                
+                portfolio_value = st.number_input("Portfolio Value ($)", 10000, 10000000, 100000, 10000, key="rebal_port_val")
+                
+                if st.button("Analyze Rebalance Costs", type="primary", key="analyze_costs"):
+                    with st.spinner("Calculating costs..."):
+                        # Use current weights vs equal weight as example
+                        current_w = {t: weights[t]/100 for t in tickers}
+                        target_w = {t: 1/len(tickers) for t in tickers}
+                        
+                        # Placeholder prices
+                        prices_dict = {t: 100 for t in tickers}
+                        
+                        cost_result = calculate_rebalance_costs(
+                            current_w, target_w, portfolio_value, prices_dict
+                        )
+                        
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Total Cost", f"${cost_result['total_cost']:.2f}")
+                        col2.metric("Cost (bps)", f"{cost_result['total_cost_bps']:.1f}")
+                        col3.metric("Turnover", f"{cost_result['turnover_pct']:.1f}%")
+                        
+                        # Trade list
+                        if cost_result['trades']:
+                            st.markdown("#### Proposed Trades")
+                            trades_df = pd.DataFrame(cost_result['trades'])
+                            st.dataframe(trades_df, use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
                 
-                if port_enhanced_subtab == "⚖️ Risk Parity":
-                    st.markdown("### Risk Parity Optimization")
-                    st.info("Allocate capital so each asset contributes equally to portfolio risk.")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        target_vol = st.slider("Target Volatility", 0.05, 0.30, 0.15, 0.01)
-                    with col2:
-                        max_weight = st.slider("Max Weight per Asset", 0.20, 0.60, 0.40, 0.05)
-                    
-                    if st.button("Calculate Risk Parity", type="primary"):
-                        with st.spinner("Optimizing..."):
-                            rp_result = risk_parity_weights(
-                                returns_df, 
-                                target_risk=target_vol,
-                                max_weight=max_weight
-                            )
-                            
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric("Portfolio Volatility", f"{rp_result['portfolio_volatility']:.1%}")
-                                st.metric("Diversification Ratio", f"{rp_result['diversification_ratio']:.2f}")
-                            with col2:
-                                st.metric("Leverage for Target", f"{rp_result['leverage_for_target']:.2f}x")
-                            
-                            # Weights comparison
-                            st.markdown("#### Risk Parity Weights")
-                            rp_df = pd.DataFrame({
-                                'Asset': list(rp_result['weights'].keys()),
-                                'Current Weight': [weights.get(t, 0) for t in rp_result['weights'].keys()],
-                                'Risk Parity Weight': [v * 100 for v in rp_result['weights'].values()],
-                                'Risk Contribution': [v * 100 for v in rp_result['risk_contributions'].values()]
-                            })
-                            st.dataframe(rp_df.style.format({
-                                'Current Weight': '{:.1f}%',
-                                'Risk Parity Weight': '{:.1f}%',
-                                'Risk Contribution': '{:.1f}%'
-                            }), use_container_width=True, hide_index=True)
-                            
-                            # Risk contribution chart
-                            fig = risk_contribution_chart(
-                                rp_result['risk_contributions'],
-                                title="Risk Contribution by Asset"
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
+                # Rebalancing Threshold Section
+                st.markdown("### Rebalancing Threshold Check")
+                st.info("Check if portfolio drift exceeds rebalancing thresholds.")
                 
-                elif port_enhanced_subtab == "📊 Black-Litterman":
-                    st.markdown("### Black-Litterman Model")
-                    st.info("Combine market equilibrium with your investment views.")
-                    
-                    st.markdown("#### Define Your Views")
-                    st.caption("Express views on expected returns (e.g., 'AAPL will outperform by 5%')")
-                    
-                    # Simple view input
-                    view_asset = st.selectbox("Asset with View", tickers)
-                    view_return = st.slider("Expected Annual Return", -0.20, 0.50, 0.10, 0.01)
-                    
-                    views = [{'asset': view_asset, 'return': view_return}]
-                    
-                    # Placeholder market caps (equal weight assumed)
-                    market_caps = {t: 1e9 for t in tickers}
-                    
-                    if st.button("Run Black-Litterman", type="primary"):
-                        with st.spinner("Optimizing with views..."):
-                            bl_result = black_litterman_optimization(
-                                returns_df, market_caps, views
-                            )
-                            
-                            if 'error' not in bl_result:
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.metric("Expected Return", f"{bl_result['portfolio_return']:.1%}")
-                                with col2:
-                                    st.metric("Portfolio Volatility", f"{bl_result['portfolio_volatility']:.1%}")
-                                
-                                # Show adjusted returns
-                                st.markdown("#### Posterior Expected Returns")
-                                ret_df = pd.DataFrame({
-                                    'Asset': list(bl_result['expected_returns'].keys()),
-                                    'Equilibrium': [v*100 for v in bl_result['equilibrium_returns'].values()],
-                                    'Posterior': [v*100 for v in bl_result['expected_returns'].values()],
-                                    'Weight': [v*100 for v in bl_result['weights'].values()]
-                                })
-                                st.dataframe(ret_df.style.format({
-                                    'Equilibrium': '{:.1f}%',
-                                    'Posterior': '{:.1f}%',
-                                    'Weight': '{:.1f}%'
-                                }), use_container_width=True, hide_index=True)
-                            else:
-                                st.error("Black-Litterman optimization failed")
+                threshold = st.slider("Rebalancing Threshold", 0.01, 0.20, 0.05, 0.01, key="rebal_threshold")
                 
-                elif port_enhanced_subtab == "💰 Transaction Costs":
-                    st.markdown("### Transaction Cost Analysis")
-                    st.info("Estimate costs of rebalancing to target weights.")
-                    
-                    portfolio_value = st.number_input("Portfolio Value ($)", 10000, 10000000, 100000, 10000)
-                    
-                    # Get target weights (use optimal from earlier or risk parity)
-                    if st.button("Analyze Rebalance Costs", type="primary"):
-                        with st.spinner("Calculating costs..."):
-                            # Use current weights vs equal weight as example
-                            current_w = {t: weights[t]/100 for t in tickers}
-                            target_w = {t: 1/len(tickers) for t in tickers}
-                            
-                            # Placeholder prices
-                            prices_dict = {t: 100 for t in tickers}
-                            
-                            cost_result = calculate_rebalance_costs(
-                                current_w, target_w, portfolio_value, prices_dict
-                            )
-                            
-                            col1, col2, col3 = st.columns(3)
-                            col1.metric("Total Cost", f"${cost_result['total_cost']:.2f}")
-                            col2.metric("Cost (bps)", f"{cost_result['total_cost_bps']:.1f}")
-                            col3.metric("Turnover", f"{cost_result['turnover_pct']:.1f}%")
-                            
-                            # Trade list
-                            if cost_result['trades']:
-                                st.markdown("#### Proposed Trades")
-                                trades_df = pd.DataFrame(cost_result['trades'])
-                                st.dataframe(trades_df, use_container_width=True, hide_index=True)
+                # Simulate some drift
+                current_w = {t: weights[t]/100 for t in tickers}
+                target_w = {t: weights[t]/100 for t in tickers}  # Same for demo
                 
-                elif port_enhanced_subtab == "🔄 Rebalancing":
-                    st.markdown("### Rebalancing Analysis")
-                    st.info("Check if portfolio drift exceeds rebalancing thresholds.")
-                    
-                    threshold = st.slider("Rebalancing Threshold", 0.01, 0.20, 0.05, 0.01)
-                    
-                    # Simulate some drift
-                    current_w = {t: weights[t]/100 for t in tickers}
-                    target_w = {t: weights[t]/100 for t in tickers}  # Same for demo
-                    
-                    # Add some random drift for demo
-                    import random
-                    drifted_w = {t: w * (1 + random.uniform(-0.1, 0.1)) for t, w in current_w.items()}
-                    total_d = sum(drifted_w.values())
-                    drifted_w = {t: v/total_d for t, v in drifted_w.items()}
-                    
-                    rebal_result = threshold_rebalancing(drifted_w, target_w, threshold)
-                    
-                    if rebal_result['needs_rebalance']:
-                        st.warning(f"⚠️ Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
-                    else:
-                        st.success(f"✅ No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
-                    
-                    # Show drifts
-                    drift_df = pd.DataFrame({
-                        'Asset': list(rebal_result['drifts'].keys()),
-                        'Drift': [v*100 for v in rebal_result['drifts'].values()],
-                        'Threshold': [threshold*100]*len(rebal_result['drifts'])
-                    })
-                    st.dataframe(drift_df.style.format({'Drift': '{:.2f}%', 'Threshold': '{:.1f}%'}),
-                               use_container_width=True, hide_index=True)
+                # Add some random drift for demo
+                import random
+                drifted_w = {t: w * (1 + random.uniform(-0.1, 0.1)) for t, w in current_w.items()}
+                total_d = sum(drifted_w.values())
+                drifted_w = {t: v/total_d for t, v in drifted_w.items()}
                 
-                elif port_enhanced_subtab == "📈 Risk Decomposition":
-                    st.markdown("### Portfolio Risk Decomposition")
-                    st.info("Understand how each asset contributes to total portfolio risk.")
-                    
-                    weights_dict = {t: weights[t]/100 for t in tickers}
-                    decomp = portfolio_risk_decomposition(weights_dict, returns_df)
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Portfolio Volatility", f"{decomp['portfolio_volatility']:.1%}")
-                    with col2:
-                        st.metric("Concentration (HHI)", f"{decomp['concentration']:.0f}")
-                    
-                    # Risk contribution chart
-                    fig = risk_contribution_chart(
-                        decomp['pct_contributions'],
-                        title="Risk Contribution (%)"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Detailed breakdown
-                    st.markdown("#### Detailed Breakdown")
-                    decomp_df = pd.DataFrame({
-                        'Asset': list(decomp['risk_contributions'].keys()),
-                        'Risk Contribution': list(decomp['risk_contributions'].values()),
-                        '% of Total': list(decomp['pct_contributions'].values()),
-                        'Marginal Contribution': list(decomp['marginal_contributions'].values())
-                    })
-                    st.dataframe(decomp_df.style.format({
-                        'Risk Contribution': '{:.4f}',
-                        '% of Total': '{:.1f}%',
-                        'Marginal Contribution': '{:.4f}'
-                    }), use_container_width=True, hide_index=True)
+                rebal_result = threshold_rebalancing(drifted_w, target_w, threshold)
+                
+                if rebal_result['needs_rebalance']:
+                    st.warning(f"⚠️ Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
+                else:
+                    st.success(f"✅ No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
+                
+                # Show drifts
+                drift_df = pd.DataFrame({
+                    'Asset': list(rebal_result['drifts'].keys()),
+                    'Drift': [v*100 for v in rebal_result['drifts'].values()],
+                    'Threshold': [threshold*100]*len(rebal_result['drifts'])
+                })
+                st.dataframe(drift_df.style.format({'Drift': '{:.2f}%', 'Threshold': '{:.1f}%'}),
+                           use_container_width=True, hide_index=True)
         
         # TAB: DIGITAL TWIN (v4.3) - if enabled
         if enable_digital_twin and HAS_DIGITAL_TWIN:

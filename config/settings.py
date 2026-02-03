@@ -31,6 +31,60 @@ CACHE_DIR.mkdir(exist_ok=True)
 ALPHA_VANTAGE_KEY = os.getenv('ALPHA_VANTAGE_KEY', '')
 
 # =============================================================================
+# DATA SOURCES CONFIGURATION
+# =============================================================================
+DATA_SOURCES = {
+    'yahoo': {
+        'enabled': True,
+        'priority': 1,
+        'type': 'Free API',
+        'description': 'Yahoo Finance - Free, reliable data source'
+    },
+    'alpha_vantage': {
+        'api_key': os.getenv('ALPHA_VANTAGE_KEY', ''),
+        'enabled': bool(os.getenv('ALPHA_VANTAGE_KEY', '')),
+        'priority': 2,
+        'type': 'Free API (Limited)',
+        'description': 'Alpha Vantage - Free tier: 5 calls/min'
+    },
+    'polygon': {
+        'api_key': os.getenv('POLYGON_API_KEY', ''),
+        'enabled': bool(os.getenv('POLYGON_API_KEY', '')),
+        'priority': 0,  # Highest priority if available
+        'type': 'Professional API',
+        'description': 'Polygon.io - Real-time, professional data'
+    },
+    'alpaca': {
+        'api_key': os.getenv('ALPACA_API_KEY', ''),
+        'api_secret': os.getenv('ALPACA_API_SECRET', ''),
+        'enabled': bool(os.getenv('ALPACA_API_KEY', '')),
+        'priority': 0,  # Highest priority if available
+        'type': 'Professional API',
+        'description': 'Alpaca Markets - Real-time, commission-free'
+    }
+}
+
+def get_active_data_source() -> dict:
+    """Get the currently active/primary data source."""
+    # Sort by priority and enabled status
+    active_sources = [
+        (name, config) for name, config in DATA_SOURCES.items()
+        if config.get('enabled', False) or name == 'yahoo'
+    ]
+    # Sort by priority (lower = higher priority)
+    active_sources.sort(key=lambda x: x[1].get('priority', 99))
+    
+    if active_sources:
+        name, config = active_sources[0]
+        return {
+            'name': name,
+            'display_name': name.replace('_', ' ').title(),
+            'type': config.get('type', 'Unknown'),
+            'description': config.get('description', '')
+        }
+    return {'name': 'yahoo', 'display_name': 'Yahoo Finance', 'type': 'Free API'}
+
+# =============================================================================
 # EMAIL SETTINGS (for alerts)
 # =============================================================================
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
