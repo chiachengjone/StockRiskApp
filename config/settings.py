@@ -34,33 +34,33 @@ ALPHA_VANTAGE_KEY = os.getenv('ALPHA_VANTAGE_KEY', '')
 # DATA SOURCES CONFIGURATION
 # =============================================================================
 DATA_SOURCES = {
-    'yahoo': {
-        'enabled': True,
-        'priority': 1,
-        'type': 'Free API',
-        'description': 'Yahoo Finance - Free, reliable data source'
-    },
-    'alpha_vantage': {
-        'api_key': os.getenv('ALPHA_VANTAGE_KEY', ''),
-        'enabled': bool(os.getenv('ALPHA_VANTAGE_KEY', '')),
-        'priority': 2,
-        'type': 'Free API (Limited)',
-        'description': 'Alpha Vantage - Free tier: 5 calls/min'
-    },
-    'polygon': {
-        'api_key': os.getenv('POLYGON_API_KEY', ''),
-        'enabled': bool(os.getenv('POLYGON_API_KEY', '')),
-        'priority': 0,  # Highest priority if available
-        'type': 'Professional API',
-        'description': 'Polygon.io - Real-time, professional data'
-    },
     'alpaca': {
         'api_key': os.getenv('ALPACA_API_KEY', ''),
         'api_secret': os.getenv('ALPACA_API_SECRET', ''),
         'enabled': bool(os.getenv('ALPACA_API_KEY', '')),
-        'priority': 0,  # Highest priority if available
+        'priority': 0,  # Highest priority - default source
         'type': 'Professional API',
         'description': 'Alpaca Markets - Real-time, commission-free'
+    },
+    'alpha_vantage': {
+        'api_key': os.getenv('ALPHA_VANTAGE_KEY', ''),
+        'enabled': bool(os.getenv('ALPHA_VANTAGE_KEY', '')),
+        'priority': 1,  # Second priority
+        'type': 'Free API (Limited)',
+        'description': 'Alpha Vantage - Free tier: 5 calls/min'
+    },
+    'yahoo': {
+        'enabled': True,
+        'priority': 2,  # Fallback source
+        'type': 'Free API',
+        'description': 'Yahoo Finance - Free, reliable fallback'
+    },
+    'polygon': {
+        'api_key': os.getenv('POLYGON_API_KEY', ''),
+        'enabled': bool(os.getenv('POLYGON_API_KEY', '')),
+        'priority': 3,
+        'type': 'Professional API',
+        'description': 'Polygon.io - Real-time, professional data'
     }
 }
 
@@ -101,8 +101,8 @@ CACHE_TTL_MINUTES = 60  # 1 hour default cache
 # =============================================================================
 # DATA SOURCE PRIORITY
 # =============================================================================
-# Order determines fallback priority
-DATA_SOURCE_PRIORITY = ['yahoo', 'alpha_vantage']
+# Order determines fallback priority (Alpaca first, Yahoo as fallback)
+DATA_SOURCE_PRIORITY = ['alpaca', 'yahoo', 'polygon', 'alpha_vantage']
 
 # =============================================================================
 # RATE LIMITS (requests per minute)

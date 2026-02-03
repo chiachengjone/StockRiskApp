@@ -44,10 +44,11 @@ except ImportError:
 try:
     from features import (
         render_sentiment_tab, render_portfolio_sentiment, SentimentVaR,
-        HAS_SENTIMENT_FEATURE
+        create_sentiment_service_from_config, HAS_SENTIMENT_FEATURE
     )
 except ImportError:
     HAS_SENTIMENT_FEATURE = False
+    create_sentiment_service_from_config = None
 
 try:
     from features import (
@@ -1687,12 +1688,15 @@ if mode == "Single Stock":
                 st.caption("NLP-based sentiment scoring and VaR adjustment")
                 
                 try:
-                    # Create returns DataFrame for sentiment analysis
-                    returns_df = pd.DataFrame({ticker: rets})
-                    weights = {ticker: 1.0}
+                    # Create SentimentService instance
+                    sentiment_service = create_sentiment_service_from_config()
                     
-                    # Render sentiment tab
-                    render_sentiment_tab(ticker, returns_df)
+                    if sentiment_service:
+                        # Render sentiment tab with proper service instance
+                        render_sentiment_tab(sentiment_service, ticker, rets)
+                    else:
+                        st.warning("Sentiment service not configured. Check API keys (POLYGON_API_KEY, ALPACA_API_KEY).")
+                        st.info("Sentiment analysis requires API keys for news data.")
                     
                 except Exception as e:
                     st.error(f"Sentiment analysis error: {e}")

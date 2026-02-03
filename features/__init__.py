@@ -16,7 +16,8 @@ try:
         create_news_sentiment_breakdown,
         create_var_comparison_chart as create_sentiment_var_chart,
         create_whale_activity_chart,
-        create_portfolio_sentiment_heatmap
+        create_portfolio_sentiment_heatmap,
+        create_sentiment_service_from_config
     )
     HAS_SENTIMENT_FEATURE = True
 except ImportError:
@@ -67,6 +68,7 @@ __all__ = [
     'SentimentVaR',
     'render_sentiment_tab',
     'render_portfolio_sentiment',
+    'create_sentiment_service_from_config',
     'HAS_SENTIMENT_FEATURE',
     # Digital Twin
     'DigitalTwinEngine',
