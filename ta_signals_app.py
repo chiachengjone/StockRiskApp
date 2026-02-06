@@ -54,6 +54,17 @@ from services.signals_service import (
     MIN_SHARPE
 )
 
+# Import new services for enhanced features
+from services.pattern_service import PatternService, PatternType, PatternDirection
+from services.mtf_service import MTFService, TrendDirection, TimeframeAlignment
+from services.regime_service import RegimeService, MarketRegime, VolatilityRegime
+from services.divergence_service import DivergenceService, DivergenceType
+from services.strategy_service import StrategyService
+from services.advanced_backtest_service import AdvancedBacktestService
+from services.alerts_service import AlertsService, AlertType, AlertPriority, AlertStatus
+from services.ta_sentiment_service import SentimentService, SentimentLevel
+from services.reporting_service import ReportingService, SignalOutcome
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -691,8 +702,14 @@ def render_indicator_card(name: str, value: float, interpretation: str) -> None:
 # MAIN TABS
 # ============================================================================
 
-def render_single_stock_analysis(ta_service: TAService, signals_service: SignalsService) -> None:
-    """Render single stock analysis tab."""
+def render_single_stock_analysis(
+    ta_service: TAService, 
+    signals_service: SignalsService,
+    pattern_service: PatternService = None,
+    mtf_service: MTFService = None,
+    divergence_service: DivergenceService = None
+) -> None:
+    """Render single stock analysis tab with extended features."""
     
     col1, col2, col3 = st.columns([2, 1, 1])
     
@@ -1446,6 +1463,588 @@ def render_signal_dashboard(ta_service: TAService, signals_service: SignalsServi
 
 
 # ============================================================================
+# NEW FEATURE RENDER FUNCTIONS
+# ============================================================================
+
+def render_pattern_analysis(pattern_service: PatternService) -> None:
+    """Render pattern recognition analysis tab."""
+    
+    st.markdown("### 🕯️ Pattern Recognition")
+    st.markdown("Detect candlestick and chart patterns")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        ticker = st.text_input("Enter Ticker Symbol", value="AAPL", key="pattern_ticker").upper()
+    
+    with col2:
+        analyze_btn = st.button("Detect Patterns", type="primary", key="pattern_analyze")
+    
+    if analyze_btn or ticker:
+        with st.spinner("Analyzing patterns..."):
+            df = fetch_stock_data(ticker, "6mo")
+            
+            if df.empty:
+                st.error(f"Could not fetch data for {ticker}")
+                return
+            
+            # Detect candlestick patterns
+            candlestick_patterns = pattern_service.detect_candlestick_patterns(df)
+            
+            # Detect chart patterns
+            chart_patterns = pattern_service.detect_chart_patterns(df)
+            
+            # Get summary
+            summary = pattern_service.get_pattern_summary(df)
+        
+        # Display summary
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Patterns", summary.get('total_patterns', 0))
+        with col2:
+            st.metric("Bullish Signals", summary.get('bullish_count', 0))
+        with col3:
+            st.metric("Bearish Signals", summary.get('bearish_count', 0))
+        with col4:
+            bias = summary.get('overall_bias', 'Neutral')
+            st.metric("Overall Bias", bias)
+        
+        st.markdown("---")
+        
+        # Recent candlestick patterns
+        st.markdown("#### Recent Candlestick Patterns")
+        
+        if candlestick_patterns:
+            recent = candlestick_patterns[-10:]  # Last 10 patterns
+            pattern_data = []
+            for p in recent:
+                pattern_data.append({
+                    'Date': p.end_date.strftime('%Y-%m-%d') if hasattr(p.end_date, 'strftime') else str(p.end_date)[:10],
+                    'Pattern': p.pattern_type.value.replace('_', ' ').title(),
+                    'Direction': '🟢 Bullish' if p.direction == PatternDirection.BULLISH else ('🔴 Bearish' if p.direction == PatternDirection.BEARISH else '⚪ Neutral'),
+                    'Reliability': f"{p.reliability.value.title()}",
+                    'Confidence': f"{p.confidence:.0f}%"
+                })
+            
+            st.dataframe(pd.DataFrame(pattern_data), use_container_width=True, hide_index=True)
+        else:
+            st.info("No candlestick patterns detected in recent data")
+        
+        # Chart patterns
+        st.markdown("#### Chart Patterns")
+        
+        if chart_patterns:
+            for p in chart_patterns[-5:]:  # Last 5 chart patterns
+                direction_emoji = '🟢' if p.direction == PatternDirection.BULLISH else ('🔴' if p.direction == PatternDirection.BEARISH else '⚪')
+                st.markdown(f"""
+                <div style="
+                    background: rgba(30, 35, 45, 0.6);
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    margin-bottom: 8px;
+                    border-left: 3px solid {'#34C759' if p.direction == PatternDirection.BULLISH else '#FF3B30'};
+                ">
+                    <div style="font-weight: 600;">{direction_emoji} {p.pattern_type.value.replace('_', ' ').title()}</div>
+                    <div style="color: #a0a0a0; font-size: 13px; margin-top: 4px;">
+                        Detected at ${p.price_at_detection:.2f} | Reliability: {p.reliability.value.title()}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No chart patterns detected in recent data")
+
+
+def render_market_regime(regime_service: RegimeService) -> None:
+    """Render market regime detection tab."""
+    
+    st.markdown("### 🌡️ Market Regime Detection")
+    st.markdown("Identify current market conditions and volatility regime")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        ticker = st.text_input("Enter Ticker Symbol", value="SPY", key="regime_ticker").upper()
+    
+    with col2:
+        analyze_btn = st.button("Analyze Regime", type="primary", key="regime_analyze")
+    
+    if analyze_btn or ticker:
+        with st.spinner("Analyzing market regime..."):
+            df = fetch_stock_data(ticker, "2y")
+            
+            if df.empty:
+                st.error(f"Could not fetch data for {ticker}")
+                return
+            
+            # Analyze regime
+            result = regime_service.analyze_regime(ticker, df)
+        
+        if not result:
+            st.error("Could not analyze regime")
+            return
+        
+        # Display current regime
+        st.markdown("---")
+        st.markdown("#### Current Market Conditions")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            regime = result.market_regime
+            regime_colors = {
+                MarketRegime.BULL: '#34C759',
+                MarketRegime.BEAR: '#FF3B30',
+                MarketRegime.SIDEWAYS: '#FF9500',
+                MarketRegime.CRASH: '#FF1744',
+                MarketRegime.RECOVERY: '#00C853'
+            }
+            color = regime_colors.get(regime, '#8E8E93')
+            st.markdown(f"""
+            <div style="text-align: center;">
+                <div style="font-size: 14px; color: #a0a0a0; text-transform: uppercase;">Market Regime</div>
+                <div style="font-size: 24px; font-weight: 600; color: {color}; margin-top: 8px;">
+                    {regime.value.replace('_', ' ').title()}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            vol_regime = result.volatility_regime
+            vol_colors = {
+                VolatilityRegime.LOW: '#34C759',
+                VolatilityRegime.NORMAL: '#007AFF',
+                VolatilityRegime.HIGH: '#FF9500',
+                VolatilityRegime.EXTREME: '#FF3B30'
+            }
+            vol_color = vol_colors.get(vol_regime, '#8E8E93')
+            st.markdown(f"""
+            <div style="text-align: center;">
+                <div style="font-size: 14px; color: #a0a0a0; text-transform: uppercase;">Volatility</div>
+                <div style="font-size: 24px; font-weight: 600; color: {vol_color}; margin-top: 8px;">
+                    {vol_regime.value.title()}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            trend = result.trend_strength
+            st.metric("Trend Strength", f"{trend:.0f}%")
+        
+        with col4:
+            confidence = result.regime_probability
+            st.metric("Confidence", f"{confidence:.0f}%")
+        
+        # Regime indicators
+        st.markdown("---")
+        st.markdown("#### Key Indicators")
+        
+        indicators = result.indicators
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            for key, value in list(indicators.items())[:4]:
+                if value is not None:
+                    if isinstance(value, float):
+                        st.markdown(f"**{key.replace('_', ' ').title()}:** {value:.2f}")
+                    else:
+                        st.markdown(f"**{key.replace('_', ' ').title()}:** {value}")
+        
+        with col2:
+            for key, value in list(indicators.items())[4:]:
+                if value is not None:
+                    if isinstance(value, float):
+                        st.markdown(f"**{key.replace('_', ' ').title()}:** {value:.2f}")
+                    else:
+                        st.markdown(f"**{key.replace('_', ' ').title()}:** {value}")
+        
+        # Trading implications
+        st.markdown("---")
+        st.markdown("#### Trading Implications")
+        
+        implications = {
+            MarketRegime.BULL: "🟢 Favor long positions. Consider trend-following strategies with trailing stops.",
+            MarketRegime.BEAR: "🔴 Exercise caution with long positions. Consider hedging or short opportunities.",
+            MarketRegime.SIDEWAYS: "⚪ Range-bound market. Consider mean-reversion strategies.",
+            MarketRegime.CRASH: "🔴 High risk environment. Reduce exposure and wait for stabilization.",
+            MarketRegime.RECOVERY: "🟢 Potential reversal. Look for early entry opportunities with tight stops."
+        }
+        
+        st.info(implications.get(result.market_regime, "Monitor market conditions closely."))
+
+
+def render_alerts_manager(alerts_service: AlertsService) -> None:
+    """Render alerts management tab."""
+    
+    st.markdown("### 🔔 Smart Alerts Manager")
+    st.markdown("Create and manage technical analysis alerts")
+    
+    # Tabs for create/view
+    alert_tab1, alert_tab2, alert_tab3 = st.tabs(["Create Alert", "Active Alerts", "History"])
+    
+    with alert_tab1:
+        st.markdown("#### Create New Alert")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            alert_symbol = st.text_input("Symbol", value="AAPL", key="alert_symbol").upper()
+            alert_name = st.text_input("Alert Name", f"My {alert_symbol} Alert", key="alert_name")
+        
+        with col2:
+            alert_type = st.selectbox(
+                "Alert Type",
+                options=[
+                    "Price Above", "Price Below", "RSI Oversold", "RSI Overbought",
+                    "MACD Bullish", "MACD Bearish", "Golden Cross", "Volume Spike"
+                ],
+                key="alert_type"
+            )
+            
+            alert_priority = st.selectbox(
+                "Priority",
+                options=["Low", "Medium", "High", "Critical"],
+                index=1,
+                key="alert_priority"
+            )
+        
+        # Threshold based on alert type
+        if "Price" in alert_type:
+            threshold = st.number_input("Price Threshold ($)", value=150.0, key="alert_threshold")
+        elif "RSI" in alert_type:
+            default_val = 30.0 if "Oversold" in alert_type else 70.0
+            threshold = st.number_input("RSI Threshold", value=default_val, min_value=0.0, max_value=100.0, key="alert_threshold")
+        elif "Volume" in alert_type:
+            threshold = st.number_input("Volume Multiplier", value=2.0, min_value=1.0, key="alert_threshold")
+        else:
+            threshold = 0.0
+        
+        if st.button("Create Alert", type="primary", key="create_alert_btn"):
+            # Map alert type string to enum
+            type_mapping = {
+                "Price Above": AlertType.PRICE_ABOVE,
+                "Price Below": AlertType.PRICE_BELOW,
+                "RSI Oversold": AlertType.RSI_OVERSOLD,
+                "RSI Overbought": AlertType.RSI_OVERBOUGHT,
+                "MACD Bullish": AlertType.MACD_BULLISH,
+                "MACD Bearish": AlertType.MACD_BEARISH,
+                "Golden Cross": AlertType.GOLDEN_CROSS,
+                "Volume Spike": AlertType.VOLUME_SPIKE
+            }
+            
+            priority_mapping = {
+                "Low": AlertPriority.LOW,
+                "Medium": AlertPriority.MEDIUM,
+                "High": AlertPriority.HIGH,
+                "Critical": AlertPriority.CRITICAL
+            }
+            
+            from services.alerts_service import AlertCondition
+            
+            condition = AlertCondition(
+                alert_type=type_mapping[alert_type],
+                symbol=alert_symbol,
+                threshold=threshold
+            )
+            
+            alert = alerts_service.create_alert(
+                name=alert_name,
+                conditions=[condition],
+                priority=priority_mapping[alert_priority]
+            )
+            
+            st.success(f"Alert created: {alert.name} (ID: {alert.id})")
+    
+    with alert_tab2:
+        st.markdown("#### Active Alerts")
+        
+        active_alerts = alerts_service.get_alerts(status=AlertStatus.ACTIVE)
+        
+        if active_alerts:
+            for alert in active_alerts[:20]:
+                priority_colors = {
+                    AlertPriority.LOW: '#8E8E93',
+                    AlertPriority.MEDIUM: '#FF9500',
+                    AlertPriority.HIGH: '#FF3B30',
+                    AlertPriority.CRITICAL: '#FF1744'
+                }
+                color = priority_colors.get(alert.priority, '#8E8E93')
+                
+                st.markdown(f"""
+                <div style="
+                    background: rgba(30, 35, 45, 0.6);
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    margin-bottom: 8px;
+                    border-left: 3px solid {color};
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600;">{alert.name}</span>
+                        <span style="color: {color}; font-size: 12px; text-transform: uppercase;">{alert.priority.value}</span>
+                    </div>
+                    <div style="color: #a0a0a0; font-size: 13px; margin-top: 4px;">
+                        ID: {alert.id} | Triggers: {alert.trigger_count}/{alert.max_triggers if alert.max_triggers > 0 else '∞'}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No active alerts. Create one in the 'Create Alert' tab.")
+    
+    with alert_tab3:
+        st.markdown("#### Alert History")
+        
+        history = alerts_service.get_trigger_history(limit=50)
+        
+        if history:
+            history_data = []
+            for trigger in history:
+                history_data.append({
+                    'Time': trigger.triggered_at.strftime('%Y-%m-%d %H:%M'),
+                    'Symbol': trigger.symbol,
+                    'Alert': trigger.alert_name,
+                    'Type': trigger.condition_type.value.replace('_', ' ').title(),
+                    'Price': f"${trigger.price_at_trigger:.2f}",
+                    'Priority': trigger.priority.value.title()
+                })
+            
+            st.dataframe(pd.DataFrame(history_data), use_container_width=True, hide_index=True)
+        else:
+            st.info("No triggered alerts yet.")
+        
+        # Statistics
+        stats = alerts_service.get_alert_statistics()
+        
+        st.markdown("---")
+        st.markdown("#### Alert Statistics")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Alerts", stats['total_alerts'])
+        with col2:
+            st.metric("Active", stats['active'])
+        with col3:
+            st.metric("Triggered", stats['triggered'])
+        with col4:
+            st.metric("Total Triggers", stats['total_triggers'])
+
+
+def render_performance_reports(reporting_service: ReportingService) -> None:
+    """Render performance reporting tab."""
+    
+    st.markdown("### 📋 Performance Reports")
+    st.markdown("Track signal performance and generate reports")
+    
+    # Tabs for different views
+    report_tab1, report_tab2, report_tab3, report_tab4 = st.tabs([
+        "Record Signal", "Signal History", "Report Card", "Export"
+    ])
+    
+    with report_tab1:
+        st.markdown("#### Record New Signal")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            symbol = st.text_input("Symbol", value="AAPL", key="report_symbol").upper()
+            signal_type = st.selectbox("Signal Type", ["BUY", "SELL"], key="report_signal_type")
+            entry_price = st.number_input("Entry Price ($)", value=150.0, min_value=0.01, key="report_entry")
+        
+        with col2:
+            signal_source = st.selectbox(
+                "Signal Source",
+                ["RSI_Oversold", "RSI_Overbought", "MACD_Cross", "MA_Crossover", 
+                 "Pattern", "Bollinger", "Manual"],
+                key="report_source"
+            )
+            target_price = st.number_input("Target Price ($)", value=160.0, min_value=0.01, key="report_target")
+            stop_loss = st.number_input("Stop Loss ($)", value=145.0, min_value=0.01, key="report_stop")
+        
+        confidence = st.slider("Confidence", 0.0, 1.0, 0.7, 0.1, key="report_confidence")
+        notes = st.text_area("Notes", "", key="report_notes")
+        
+        if st.button("Record Signal", type="primary", key="record_signal_btn"):
+            signal = reporting_service.record_signal(
+                symbol=symbol,
+                signal_type=signal_type,
+                signal_source=signal_source,
+                entry_price=entry_price,
+                target_price=target_price,
+                stop_loss=stop_loss,
+                confidence=confidence,
+                notes=notes
+            )
+            st.success(f"Signal recorded: {signal.signal_type} {signal.symbol} (ID: {signal.id})")
+    
+    with report_tab2:
+        st.markdown("#### Signal History")
+        
+        # Filters
+        col1, col2 = st.columns(2)
+        with col1:
+            filter_symbol = st.text_input("Filter by Symbol (optional)", "", key="history_filter_symbol")
+        with col2:
+            filter_outcome = st.selectbox(
+                "Filter by Outcome",
+                ["All", "Pending", "Win", "Loss", "Breakeven"],
+                key="history_filter_outcome"
+            )
+        
+        # Get signals
+        outcome_map = {
+            "All": None,
+            "Pending": SignalOutcome.PENDING,
+            "Win": SignalOutcome.WIN,
+            "Loss": SignalOutcome.LOSS,
+            "Breakeven": SignalOutcome.BREAKEVEN
+        }
+        
+        signals = reporting_service.get_signal_history(
+            symbol=filter_symbol if filter_symbol else None,
+            outcome=outcome_map[filter_outcome]
+        )
+        
+        if signals:
+            signal_data = []
+            for s in signals:
+                outcome_emoji = {
+                    SignalOutcome.WIN: '🟢',
+                    SignalOutcome.LOSS: '🔴',
+                    SignalOutcome.BREAKEVEN: '⚪',
+                    SignalOutcome.PENDING: '⏳',
+                    SignalOutcome.EXPIRED: '⌛'
+                }
+                
+                signal_data.append({
+                    'ID': s.id,
+                    'Symbol': s.symbol,
+                    'Type': s.signal_type,
+                    'Source': s.signal_source,
+                    'Entry': f"${s.entry_price:.2f}",
+                    'Exit': f"${s.exit_price:.2f}" if s.exit_price else '-',
+                    'P&L': f"{s.pnl_pct:+.1f}%" if s.pnl_pct != 0 else '-',
+                    'Outcome': f"{outcome_emoji.get(s.outcome, '')} {s.outcome.value.title()}",
+                    'Date': s.entry_date.strftime('%Y-%m-%d')
+                })
+            
+            st.dataframe(pd.DataFrame(signal_data), use_container_width=True, hide_index=True)
+            
+            # Close signal form
+            st.markdown("---")
+            st.markdown("#### Close an Open Signal")
+            
+            open_signals = reporting_service.get_open_signals()
+            if open_signals:
+                signal_options = {f"{s.id} - {s.symbol} {s.signal_type}": s.id for s in open_signals}
+                selected = st.selectbox("Select Signal", list(signal_options.keys()), key="close_signal_select")
+                exit_price = st.number_input("Exit Price ($)", value=150.0, min_value=0.01, key="close_exit_price")
+                
+                if st.button("Close Signal", key="close_signal_btn"):
+                    closed = reporting_service.close_signal(signal_options[selected], exit_price)
+                    if closed:
+                        st.success(f"Signal closed: {closed.outcome.value} ({closed.pnl_pct:+.1f}%)")
+                        st.rerun()
+        else:
+            st.info("No signals recorded yet. Record a signal in the 'Record Signal' tab.")
+    
+    with report_tab3:
+        st.markdown("#### Performance Report Card")
+        
+        if st.button("Generate Report", type="primary", key="generate_report_btn"):
+            report = reporting_service.generate_report_card()
+            
+            # Overall metrics
+            st.markdown("##### Overall Performance")
+            metrics = report.overall_metrics
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Signals", metrics.total_signals)
+            with col2:
+                st.metric("Win Rate", f"{metrics.win_rate:.1f}%")
+            with col3:
+                st.metric("Profit Factor", f"{metrics.profit_factor:.2f}")
+            with col4:
+                st.metric("Total Return", f"{metrics.total_return_pct:+.1f}%")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Winning Trades", metrics.winning_signals)
+            with col2:
+                st.metric("Losing Trades", metrics.losing_signals)
+            with col3:
+                st.metric("Avg Win", f"{metrics.avg_win_pct:+.1f}%")
+            with col4:
+                st.metric("Avg Loss", f"{metrics.avg_loss_pct:.1f}%")
+            
+            # Recommendations
+            st.markdown("---")
+            st.markdown("##### Recommendations")
+            
+            for rec in report.recommendations:
+                st.markdown(f"- {rec}")
+            
+            # By source
+            if report.by_source:
+                st.markdown("---")
+                st.markdown("##### Performance by Signal Source")
+                
+                source_data = []
+                for source, m in report.by_source.items():
+                    source_data.append({
+                        'Source': source,
+                        'Signals': m.total_signals,
+                        'Win Rate': f"{m.win_rate:.1f}%",
+                        'Return': f"{m.total_return_pct:+.1f}%",
+                        'Profit Factor': f"{m.profit_factor:.2f}"
+                    })
+                
+                st.dataframe(pd.DataFrame(source_data), use_container_width=True, hide_index=True)
+    
+    with report_tab4:
+        st.markdown("#### Export Signals")
+        
+        export_format = st.selectbox("Export Format", ["CSV", "JSON"], key="export_format")
+        
+        if st.button("Export", type="primary", key="export_btn"):
+            if export_format == "CSV":
+                csv_data = reporting_service.export_to_csv()
+                st.download_button(
+                    label="Download CSV",
+                    data=csv_data,
+                    file_name="signal_history.csv",
+                    mime="text/csv"
+                )
+            else:
+                json_data = reporting_service.export_to_json()
+                st.download_button(
+                    label="Download JSON",
+                    data=json_data,
+                    file_name="signal_history.json",
+                    mime="application/json"
+                )
+        
+        # Summary stats
+        stats = reporting_service.get_summary_stats()
+        
+        st.markdown("---")
+        st.markdown("#### Quick Stats")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**All Time**")
+            st.markdown(f"- Signals: {stats['all_time']['total_signals']}")
+            st.markdown(f"- Win Rate: {stats['all_time']['win_rate']:.1f}%")
+            st.markdown(f"- Return: {stats['all_time']['total_return']:+.1f}%")
+        
+        with col2:
+            st.markdown("**Last 30 Days**")
+            st.markdown(f"- Signals: {stats['last_30_days']['total_signals']}")
+            st.markdown(f"- Win Rate: {stats['last_30_days']['win_rate']:.1f}%")
+            st.markdown(f"- Return: {stats['last_30_days']['total_return']:+.1f}%")
+
+
+# ============================================================================
 # MAIN RENDER FUNCTION
 # ============================================================================
 
@@ -1460,22 +2059,34 @@ def render_ta_signals() -> None:
     # Initialize services
     ta_service = TAService()
     signals_service = SignalsService()
+    pattern_service = PatternService()
+    mtf_service = MTFService()
+    regime_service = RegimeService()
+    divergence_service = DivergenceService()
+    strategy_service = StrategyService()
+    alerts_service = AlertsService()
+    reporting_service = ReportingService()
     
     # Header
     st.markdown("## Technical Analysis Signals")
     st.markdown("Advanced technical indicators and signal generation")
     
-    # Tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Single Stock",
-        "Dashboard",
-        "Screener",
-        "Backtest",
-        "Portfolio"
+    # Tabs - Extended with new features
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+        "📈 Single Stock",
+        "📊 Dashboard",
+        "🔍 Screener",
+        "⏱️ Backtest",
+        "💼 Portfolio",
+        "🕯️ Patterns",
+        "🌡️ Regime",
+        "🔔 Alerts",
+        "📋 Reports"
     ])
     
     with tab1:
-        render_single_stock_analysis(ta_service, signals_service)
+        render_single_stock_analysis(ta_service, signals_service, pattern_service, 
+                                     mtf_service, divergence_service)
     
     with tab2:
         render_signal_dashboard(ta_service, signals_service)
@@ -1488,6 +2099,18 @@ def render_ta_signals() -> None:
     
     with tab5:
         render_portfolio_signals(ta_service, signals_service)
+    
+    with tab6:
+        render_pattern_analysis(pattern_service)
+    
+    with tab7:
+        render_market_regime(regime_service)
+    
+    with tab8:
+        render_alerts_manager(alerts_service)
+    
+    with tab9:
+        render_performance_reports(reporting_service)
 
 
 # ============================================================================

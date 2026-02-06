@@ -5,7 +5,66 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-4.3-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-4.4-brightgreen.svg)
+
+## What's New in v4.4
+
+### 🕯️ Pattern Recognition
+- **Candlestick Patterns** - 17+ patterns: Doji, Hammer, Engulfing, Morning/Evening Star, Harami, Three White Soldiers, etc.
+- **Chart Patterns** - Double Top/Bottom, Head & Shoulders, Triangles, Wedges, Cup & Handle
+- **Pattern Reliability Scoring** - High/Medium/Low reliability classification
+- **Pattern History** - Track pattern occurrences with bullish/bearish bias summary
+
+### 📊 Multi-Timeframe Analysis
+- **5 Timeframes** - 15min, 1hour, 4hour, Daily, Weekly synchronization
+- **Trend Alignment Detection** - Identify when all timeframes agree
+- **MTF Dashboard** - Visual heatmap of trend direction across timeframes
+- **Higher Timeframe Confirmation** - Filter signals by HTF trend alignment
+
+### 🌡️ Market Regime Detection
+- **Bull/Bear/Sideways Classification** - GMM-based regime identification
+- **Volatility Regime** - Low/Normal/High/Extreme volatility detection
+- **Trend Strength Metrics** - Quantified trend momentum (0-100%)
+- **Trading Implications** - Strategy recommendations per regime
+
+### 📈 Divergence Detection
+- **RSI Divergence** - Regular and hidden bullish/bearish divergences
+- **MACD Divergence** - Histogram and line divergence detection
+- **Volume Divergence** - OBV-based price/volume divergences
+- **Divergence Scoring** - Strength rating with historical accuracy
+
+### 🎯 Strategy Builder
+- **Custom Strategy Creation** - Rule-based entry/exit conditions
+- **5 Pre-built Templates** - Golden Cross, RSI Mean Reversion, MACD Crossover, Bollinger Breakout, ADX Trend Following
+- **Strategy Backtesting** - Test custom strategies with performance metrics
+- **Strategy Save/Load** - Persist strategies to JSON files
+
+### ⚡ Advanced Backtesting
+- **Walk-Forward Analysis** - In-sample/out-of-sample validation
+- **Monte Carlo Simulation** - Trade reshuffling for robustness testing
+- **Parameter Optimization** - Grid search with sensitivity analysis
+- **Statistical Significance** - T-tests and Sharpe ratio difference tests
+
+### 🔔 Smart Alerts System
+- **Price Alerts** - Above/below/crossing price levels
+- **Indicator Alerts** - RSI overbought/oversold, MACD crossovers
+- **Pattern Alerts** - Golden Cross, Death Cross, BB Squeeze
+- **Volume Alerts** - Spike and drought detection
+- **Alert History** - Full trigger history with timestamps
+
+### 📋 Performance Reporting
+- **Signal Tracking** - Record entry/exit with outcomes
+- **Report Cards** - Win rate, profit factor, expectancy metrics
+- **Performance Attribution** - By source, symbol, time period
+- **Export** - CSV and JSON export of signal history
+
+### 💬 Sentiment Analysis
+- **Text Sentiment Scoring** - Keyword-based bullish/bearish analysis
+- **Sentiment Aggregation** - Multi-source sentiment combination
+- **Sentiment Velocity** - Rate of sentiment change tracking
+- **Price Correlation** - Sentiment-price relationship analysis
+
+---
 
 ## What's New in v4.3
 
@@ -180,6 +239,58 @@ Factor analysis & advanced metrics:
 - Kelly Criterion position sizing
 - ESG rating integration
 - Performance attribution
+
+### `services/` (Enhanced in v4.4)
+TA Signals service modules:
+
+#### `services/ta_service.py`
+- Technical indicator calculations (SMA, EMA, RSI, MACD, BB, ADX, Stochastic, ATR)
+- Indicator caching and optimization
+
+#### `services/signals_service.py`
+- Signal generation from indicators
+- Risk-filtered signals with volatility/beta/Sharpe filters
+- Backtesting engine for signal validation
+
+#### `services/pattern_service.py` (NEW)
+- Candlestick pattern detection (17+ patterns)
+- Chart pattern recognition (Double Top/Bottom, H&S, Triangles)
+- Pattern reliability and strength scoring
+
+#### `services/mtf_service.py` (NEW)
+- Multi-timeframe trend analysis (15m to Weekly)
+- Timeframe alignment detection
+- Higher timeframe confirmation
+
+#### `services/regime_service.py` (NEW)
+- Market regime classification (Bull/Bear/Sideways)
+- Volatility regime detection
+- GMM-based regime identification
+
+#### `services/divergence_service.py` (NEW)
+- RSI/MACD/Volume divergence detection
+- Regular and hidden divergence classification
+- Divergence strength scoring
+
+#### `services/strategy_service.py` (NEW)
+- Custom strategy builder with conditions/rules
+- Pre-built strategy templates
+- Strategy persistence (save/load)
+
+#### `services/advanced_backtest_service.py` (NEW)
+- Walk-forward analysis
+- Monte Carlo trade simulation
+- Parameter optimization grid search
+
+#### `services/alerts_service.py` (NEW)
+- Price and indicator alerts
+- Alert templates (RSI, MACD, Golden Cross)
+- Alert history tracking
+
+#### `services/reporting_service.py` (NEW)
+- Signal performance tracking
+- Report card generation
+- CSV/JSON export
 
 ### `utils/` (NEW in v4.1)
 Enhanced utilities package:
