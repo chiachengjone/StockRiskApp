@@ -1861,10 +1861,10 @@ def create_risk_score_gauge(
     score: float,
     grade: str,
     color: str,
-    title: str = "Portfolio Risk Score"
+    title: str = "Risk"
 ) -> go.Figure:
     """
-    Create risk score gauge visualization.
+    Create compact risk score gauge - Bloomberg style.
     
     Args:
         score: Risk score 0-100
@@ -1876,34 +1876,36 @@ def create_risk_score_gauge(
         Plotly figure
     """
     fig = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
+        mode="gauge+number",
         value=score,
-        number={'suffix': f' ({grade})', 'font': {'size': 40}},
-        title={'text': title, 'font': {'size': 16}},
+        number={'suffix': f' {grade}', 'font': {'size': 20, 'family': 'SF Mono, monospace', 'color': '#58a6ff'}},
+        title={'text': title, 'font': {'size': 10, 'color': '#8b949e'}},
         gauge={
-            'axis': {'range': [0, 100], 'tickwidth': 1},
-            'bar': {'color': color},
-            'bgcolor': 'rgba(0,0,0,0)',
-            'borderwidth': 2,
-            'bordercolor': 'gray',
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': '#30363d', 'tickfont': {'size': 8}},
+            'bar': {'color': color, 'thickness': 0.6},
+            'bgcolor': '#21262d',
+            'borderwidth': 1,
+            'bordercolor': '#30363d',
             'steps': [
-                {'range': [0, 20], 'color': '#E8F5E9'},
-                {'range': [20, 40], 'color': '#C8E6C9'},
-                {'range': [40, 60], 'color': '#FFF9C4'},
-                {'range': [60, 80], 'color': '#FFECB3'},
-                {'range': [80, 100], 'color': '#FFCDD2'}
+                {'range': [0, 20], 'color': '#0d4429'},
+                {'range': [20, 40], 'color': '#1a4d2e'},
+                {'range': [40, 60], 'color': '#3d3d1a'},
+                {'range': [60, 80], 'color': '#4d2a1a'},
+                {'range': [80, 100], 'color': '#5c1a1a'}
             ],
             'threshold': {
-                'line': {'color': 'red', 'width': 4},
-                'thickness': 0.75,
+                'line': {'color': '#f85149', 'width': 2},
+                'thickness': 0.6,
                 'value': 80
             }
         }
     ))
     
     fig.update_layout(
-        height=300,
-        margin=dict(l=20, r=20, t=50, b=20)
+        height=150,
+        margin=dict(l=10, r=10, t=30, b=10),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
     
     return apply_dark_theme(fig)

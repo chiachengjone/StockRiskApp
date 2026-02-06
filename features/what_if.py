@@ -683,37 +683,6 @@ def render_what_if_tab(
                            use_container_width=True, hide_index=True)
         else:
             st.info("No trades needed - proposed weights match current allocation.")
-    
-    # Optimization helpers
-    st.divider()
-    st.markdown("#### Quick Optimization")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("**Max Sharpe Ratio**")
-        st.caption("Optimize for best risk-adjusted return")
-        if st.button("Maximize Sharpe", key="max_sharpe_btn"):
-            opt_weights = analyzer.optimize_for_target()
-            # Convert to percentages for session state
-            st.session_state.what_if_weights = {k: v * 100 for k, v in opt_weights.items()}
-            st.rerun()
-    
-    with col2:
-        st.markdown("**Target Return**")
-        target_ret = st.slider("Select Target", 0, 30, 10, format="%d%%", key="target_ret_slider")
-        if st.button("Optimize for Return", key="target_ret_btn"):
-            opt_weights = analyzer.optimize_for_target(target_return=target_ret / 100)
-            st.session_state.what_if_weights = {k: v * 100 for k, v in opt_weights.items()}
-            st.rerun()
-    
-    with col3:
-        st.markdown("**Target Volatility**")
-        target_vol = st.slider("Select Target", 5, 30, 15, format="%d%%", key="target_vol_slider")
-        if st.button("Optimize for Vol", key="target_vol_btn"):
-            opt_weights = analyzer.optimize_for_target(target_volatility=target_vol / 100)
-            st.session_state.what_if_weights = {k: v * 100 for k, v in opt_weights.items()}
-            st.rerun()
 
 
 def render_scenario_builder():

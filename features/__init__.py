@@ -86,6 +86,26 @@ try:
 except ImportError:
     HAS_PORTFOLIO_BUILDER = False
 
+# Portfolio Forecast
+try:
+    from .forecast import (
+        PortfolioForecastEngine,
+        SingleStockForecastEngine,
+        ForecastResult,
+        GrowthScenario,
+        create_fan_chart as create_forecast_fan_chart,
+        create_scenario_chart,
+        create_probability_chart,
+        create_stock_price_chart,
+        create_stock_scenario_chart,
+        create_stock_distribution_chart,
+        render_forecast_tab,
+        render_single_stock_forecast_tab,
+        HAS_FORECAST
+    )
+except ImportError:
+    HAS_FORECAST = False
+
 __all__ = [
     'AlertManager', 
     'ReportGenerator', 
@@ -111,7 +131,7 @@ __all__ = [
     'render_what_if_tab',
     'render_scenario_builder',
     'HAS_WHAT_IF',
-    # Portfolio Builder (v4.4)
+    # Portfolio Builder
     'RiskBudgetResult',
     'FactorPortfolioResult',
     'WhatIfPreset',
@@ -123,4 +143,12 @@ __all__ = [
     'render_factor_builder_tab',
     'render_presets_tab',
     'HAS_PORTFOLIO_BUILDER',
+    # Portfolio Forecast
+    'PortfolioForecastEngine',
+    'SingleStockForecastEngine',
+    'ForecastResult',
+    'GrowthScenario',
+    'render_forecast_tab',
+    'render_single_stock_forecast_tab',
+    'HAS_FORECAST',
 ]

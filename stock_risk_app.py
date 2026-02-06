@@ -1,12 +1,13 @@
 """
-STOCK RISK MODELLING APP v4.4
-==============================
+STOCK RISK MODELLING APP
+========================
 Streamlit + yfinance + GARCH + EVT + Monte Carlo + Portfolio Mode + Stress Testing
 + Fama-French Factors + Kelly Criterion + ESG + XGBoost AI VaR
-+ Options Analytics + Fundamentals + Comparison + Alerts + PDF Reports
++ Options Analytics + Fundamentals + Comparison + PDF Reports
 + Enhanced Analytics + Risk Parity + Black-Litterman + Real-time Features
 + Risk Score | Historical Scenarios | Sector Exposure | VaR Backtesting
 + Performance Attribution | Correlation Network | Risk Budget | Factor Builder
++ Growth Forecast | Fan Charts | Scenario Projections
 """
 
 # Load environment variables FIRST before any other imports
@@ -53,7 +54,7 @@ try:
 except ImportError:
     HAS_FEATURES = False
 
-# Import new v4.2 features (sentiment, digital twin, what-if)
+# Import extended features (sentiment, digital twin, what-if)
 try:
     from features import (
         render_sentiment_tab, render_portfolio_sentiment, SentimentVaR,
@@ -79,7 +80,7 @@ try:
 except ImportError:
     HAS_WHAT_IF = False
 
-# Import Portfolio Builder (v4.4)
+# Import Portfolio Builder
 try:
     from features import (
         render_risk_budget_tab, render_factor_builder_tab, render_presets_tab,
@@ -88,6 +89,15 @@ try:
     )
 except ImportError:
     HAS_PORTFOLIO_BUILDER = False
+
+# Import Portfolio Forecast
+try:
+    from features import (
+        render_forecast_tab, render_single_stock_forecast_tab, 
+        PortfolioForecastEngine, SingleStockForecastEngine, HAS_FORECAST
+    )
+except ImportError:
+    HAS_FORECAST = False
 
 # Import sentiment service
 try:
@@ -101,7 +111,7 @@ except ImportError:
     CONFIG_COLORS = None
     CONFIG_STOCKS = None
 
-# Import enhanced utilities (v4.1)
+# Import enhanced utilities
 try:
     from utils import (
         # Performance
@@ -133,10 +143,10 @@ try:
         interactive_weight_slider_chart, weight_allocation_chart,
         # Realtime
         get_live_quote, is_market_open, calculate_live_pnl, RealtimeEngine,
-        # New: WebSocket Realtime
+        # WebSocket Realtime
         WebSocketPriceStream, RealTimePriceAggregator,
         create_realtime_dashboard, display_websocket_status,
-        # New v4.4: Enhanced Analytics & Visualization
+        # Enhanced Analytics & Visualization
         calculate_unified_risk_score, replay_historical_scenario,
         replay_all_scenarios, analyze_sector_exposure,
         calculate_performance_attribution, run_var_backtest,
@@ -168,129 +178,160 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for clean, minimal design with dark theme
+# Bloomberg Terminal Style CSS - Dark, Dense, Professional
 st.markdown("""
 <style>
-    /* Dark theme for entire app */
+    /* Professional Terminal Dark Theme */
     .stApp {
-        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-        background-color: #0e1117 !important;
-        color: #fafafa !important;
+        font-family: 'SF Mono', 'Consolas', 'Monaco', 'Lucida Console', monospace;
+        background-color: #0d1117 !important;
+        color: #58a6ff !important;
     }
     
-    /* Main content background */
     .main {
-        background-color: #0e1117 !important;
+        background-color: #0d1117 !important;
     }
     
-    /* Subtle headers */
+    /* Professional Blue Headers */
     h1, h2, h3 {
-        font-weight: 500 !important;
-        letter-spacing: -0.02em;
-        color: #fafafa !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.02em;
+        color: #58a6ff !important;
+        text-transform: uppercase;
+        font-size: 0.95rem !important;
     }
     
-    /* Clean metric cards */
+    h1 { font-size: 1.1rem !important; }
+    
+    /* Compact metric cards */
     [data-testid="stMetricValue"] {
-        font-size: 1.4rem !important;
-        font-weight: 500 !important;
-        color: #fafafa !important;
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        color: #7ee787 !important;
+        font-family: 'SF Mono', monospace !important;
     }
     
     [data-testid="stMetricLabel"] {
-        font-size: 0.75rem !important;
+        font-size: 0.65rem !important;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-        opacity: 0.7;
-        color: #a0a0a0 !important;
+        letter-spacing: 0.08em;
+        color: #8b949e !important;
     }
     
-    /* Subtle dividers */
+    [data-testid="stMetricDelta"] {
+        font-size: 0.7rem !important;
+    }
+    
+    /* Thin dividers */
     hr {
         border: none;
         height: 1px;
-        background: rgba(255, 255, 255, 0.1);
-        margin: 1.5rem 0;
+        background: #21262d;
+        margin: 0.8rem 0;
     }
     
-    /* Clean buttons */
+    /* Compact buttons */
     .stButton > button {
-        border-radius: 8px;
+        border-radius: 6px;
         font-weight: 500;
-        letter-spacing: 0.02em;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        background-color: #21262d !important;
+        border: 1px solid #30363d !important;
+        color: #c9d1d9 !important;
     }
     
-    /* Subtle tabs */
+    .stButton > button:hover {
+        background-color: #30363d !important;
+        border-color: #58a6ff !important;
+        color: #58a6ff !important;
+    }
+    
+    /* Compact tabs */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 2rem;
-        background-color: transparent !important;
+        gap: 0.5rem;
+        background-color: #161b22 !important;
+        border-bottom: 1px solid #21262d;
     }
     
     .stTabs [data-baseweb="tab"] {
-        font-size: 0.9rem;
+        font-size: 0.75rem;
         font-weight: 500;
-        color: #a0a0a0 !important;
+        color: #8b949e !important;
+        padding: 0.4rem 0.8rem;
+        text-transform: uppercase;
     }
     
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #fafafa !important;
+        color: #58a6ff !important;
+        border-bottom: 2px solid #58a6ff !important;
     }
     
-    /* Clean dataframes */
+    /* Dense dataframes */
     .stDataFrame {
-        border-radius: 8px;
+        border-radius: 6px;
+        font-size: 0.75rem !important;
     }
     
-    /* Dark sidebar styling */
+    /* Dark sidebar */
     [data-testid="stSidebar"] {
-        background: #1a1d24 !important;
+        background: #161b22 !important;
+        border-right: 1px solid #21262d;
     }
     
     [data-testid="stSidebar"] * {
-        color: #fafafa !important;
+        color: #c9d1d9 !important;
     }
     
-    /* Sidebar widgets */
     [data-testid="stSidebar"] .stMarkdown {
-        color: #fafafa !important;
+        color: #c9d1d9 !important;
     }
     
-    /* Expander in sidebar */
     [data-testid="stSidebar"] .streamlit-expanderHeader {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: #fafafa !important;
+        background-color: #21262d !important;
+        color: #58a6ff !important;
+        font-size: 0.75rem;
     }
     
-    /* Input fields dark theme */
+    /* Input fields */
     .stTextInput input, .stNumberInput input, .stSelectbox select {
-        background-color: #262730 !important;
-        color: #fafafa !important;
-        border-color: rgba(255, 255, 255, 0.1) !important;
+        background-color: #21262d !important;
+        color: #c9d1d9 !important;
+        border: 1px solid #30363d !important;
+        font-family: 'SF Mono', monospace !important;
+        font-size: 0.8rem !important;
     }
     
-    /* Slider */
     .stSlider {
-        color: #fafafa !important;
+        color: #58a6ff !important;
     }
     
-    /* Remove excessive padding */
+    /* Top padding for content */
     .block-container {
-        padding-top: 2rem;
+        padding-top: 3rem;
+        padding-bottom: 0;
     }
     
-    /* Caption text */
     .caption, .stCaption {
-        color: #a0a0a0 !important;
+        color: #6e7681 !important;
+        font-size: 0.7rem !important;
     }
     
-    /* Radio buttons */
-    .stRadio label {
-        color: #fafafa !important;
+    .stRadio label, .stCheckbox label, .stToggle label {
+        color: #c9d1d9 !important;
+        font-size: 0.8rem !important;
     }
     
-    /* Checkbox/Toggle */
-    .stCheckbox label, .stToggle label {
-        color: #fafafa !important;
+    /* Expander compact */
+    .streamlit-expanderHeader {
+        font-size: 0.8rem !important;
+        padding: 0.5rem !important;
+    }
+    
+    /* Info/Warning boxes */
+    .stAlert {
+        padding: 0.5rem !important;
+        font-size: 0.75rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -363,15 +404,6 @@ with st.sidebar:
     theme_dark = st.toggle("Dark Charts", value=True)
     auto_refresh = st.toggle("Auto-Refresh (5min)", value=False)
     
-    # Alerts Section
-    if HAS_FEATURES:
-        st.divider()
-        alert_manager = AlertManager()
-        alert_summary = alert_manager.get_summary()
-        st.markdown(f"**Alerts:** {alert_summary['active_alerts']} active")
-        if alert_summary['triggered_today'] > 0:
-            st.warning(f"{alert_summary['triggered_today']} alerts triggered today")
-    
     # Market Status
     if HAS_ENHANCED_UTILS:
         st.divider()
@@ -415,7 +447,7 @@ with st.sidebar:
     else:
         st.warning("Using GradientBoosting (XGBoost unavailable)")
     
-    # New Features (v4.3) - All enabled by default when available
+    # Extended Features - All enabled by default when available
     # Features are automatically enabled if the modules are available
     enable_sentiment = HAS_SENTIMENT_FEATURE and HAS_SENTIMENT
     enable_digital_twin = HAS_DIGITAL_TWIN
@@ -445,7 +477,7 @@ with st.sidebar:
         st.info("TA Signals extension not available")
     
     st.divider()
-    st.caption("v4.3" + (" | Enhanced" if HAS_ENHANCED_UTILS else "") + (" | TA" if HAS_TA_SIGNALS else ""))
+    st.caption("Risk Model" + (" | Enhanced" if HAS_ENHANCED_UTILS else "") + (" | TA" if HAS_TA_SIGNALS else ""))
 
 # ============================================================================
 # TA SIGNALS MODE
@@ -754,18 +786,18 @@ if mode == "Single Stock":
         enable_sentiment = st.session_state.get('enable_sentiment', False)
         
         if enable_sentiment and HAS_SENTIMENT_FEATURE:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
-                "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
+                "Overview", "Forecast", "VaR Analysis", "Monte Carlo", "Stress Test", 
                 "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Sentiment", "Export"
             ])
-            export_tab = tab11
+            export_tab = tab12
         else:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
-                "Overview", "VaR Analysis", "Monte Carlo", "Stress Test", 
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
+                "Overview", "Forecast", "VaR Analysis", "Monte Carlo", "Stress Test", 
                 "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Export"
             ])
-            tab11 = None
-            export_tab = tab10
+            tab12 = None
+            export_tab = tab11
         
         # TAB 1: OVERVIEW
         with tab1:
@@ -869,8 +901,26 @@ if mode == "Single Stock":
                     
                     st.caption(f"Last updated: {live.get('last_updated', 'Unknown')}")
         
-        # TAB 2: VAR ANALYSIS
+        # TAB 2: FORECAST
         with tab2:
+            try:
+                if HAS_FORECAST:
+                    # Get current stock price
+                    current_price = float(prices.iloc[-1]) if len(prices) > 0 else 100.0
+                    
+                    # Use single stock forecast function
+                    render_single_stock_forecast_tab(
+                        returns=rets,
+                        current_price=current_price,
+                        ticker=ticker
+                    )
+                else:
+                    st.warning("Forecast module not available.")
+            except Exception as e:
+                st.error(f"Forecast error: {e}")
+        
+        # TAB 3: VAR ANALYSIS
+        with tab3:
             st.subheader("Value at Risk Analysis")
             
             col1, col2, col3, col4 = st.columns(4)
@@ -960,8 +1010,8 @@ if mode == "Single Stock":
                         )
                         st.plotly_chart(fig_bt, use_container_width=True)
         
-        # TAB 3: MONTE CARLO
-        with tab3:
+        # TAB 4: MONTE CARLO
+        with tab4:
             st.subheader("Monte Carlo Simulation")
             
             col1, col2 = st.columns([1, 3])
@@ -1004,8 +1054,8 @@ if mode == "Single Stock":
                 st.plotly_chart(fig_cone, use_container_width=True)
                 st.caption(f"At horizon: 5% worst = {cone_p5:.1f}, Median = {cone_p50:.1f}, 95% best = {cone_p95:.1f}")
         
-        # TAB 4: STRESS TEST
-        with tab4:
+        # TAB 5: STRESS TEST
+        with tab5:
             st.subheader("Stress Testing")
             st.markdown(f"Impact on {ticker} Position")
             
@@ -1054,8 +1104,8 @@ if mode == "Single Stock":
                                     template='plotly_dark' if theme_dark else 'plotly_white', height=350)
             st.plotly_chart(fig_stress, use_container_width=True)
         
-        # TAB 5: ADVANCED
-        with tab5:
+        # TAB 6: ADVANCED
+        with tab6:
             st.subheader("Advanced Risk Models")
             
             # GARCH Model (always shown - advanced mode is always enabled)
@@ -1197,8 +1247,8 @@ if mode == "Single Stock":
                         key="download_html"
                     )
         
-        # TAB 6: FACTORS
-        with tab6:
+        # TAB 7: FACTORS
+        with tab7:
             st.subheader("Factor Analysis")
             
             fa = FactorAnalyzer()
@@ -1272,8 +1322,8 @@ if mode == "Single Stock":
                                      showlegend=False, height=300)
                 st.plotly_chart(fig_esg, use_container_width=True)
         
-        # TAB 7: AI RISK
-        with tab7:
+        # TAB 8: AI RISK
+        with tab8:
             st.subheader("AI-Powered Risk Prediction")
             
             ml = MLPredictor()
@@ -1390,8 +1440,8 @@ if mode == "Single Stock":
                 st.error(ml_results.get('error', 'ML prediction failed'))
                 st.info("Ensure XGBoost is installed: pip install xgboost")
         
-        # TAB 8: OPTIONS ANALYTICS (NEW)
-        with tab8:
+        # TAB 9: OPTIONS ANALYTICS
+        with tab9:
             st.subheader("Options Analytics")
             
             if HAS_FEATURES:
@@ -1592,8 +1642,8 @@ if mode == "Single Stock":
             else:
                 st.info("Options analytics module not available. Check installation.")
         
-        # TAB 9: FUNDAMENTALS (NEW)
-        with tab9:
+        # TAB 10: FUNDAMENTALS
+        with tab10:
             st.subheader("Fundamental Analysis")
             
             if HAS_FEATURES and info:
@@ -1695,9 +1745,9 @@ if mode == "Single Stock":
             else:
                 st.info("Fundamental analysis requires company info data")
         
-        # TAB 10: SENTIMENT ANALYSIS (v4.3) - if enabled
-        if tab11 is not None and st.session_state.get('enable_sentiment', False):
-            with tab10:
+        # TAB 11: SENTIMENT ANALYSIS - if enabled
+        if tab12 is not None and st.session_state.get('enable_sentiment', False):
+            with tab11:
                 st.subheader("Sentiment Analysis")
                 st.caption("NLP-based sentiment scoring and VaR adjustment")
                 
@@ -1790,35 +1840,6 @@ if mode == "Single Stock":
                     st.info("PDF generation requires fpdf2: `pip install fpdf2`")
             else:
                 st.info("Report generation module not available")
-            
-            # Alerts Management
-            st.markdown("---")
-            st.markdown("#### Risk Alerts")
-            
-            if HAS_FEATURES:
-                alert_manager = AlertManager()
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("**Create New Alert**")
-                    alert_metric = st.selectbox("Metric", ['var', 'volatility', 'max_drawdown', 'sharpe'], key="alert_metric")
-                    alert_threshold = st.number_input("Threshold", value=0.05, step=0.01, key="alert_thresh")
-                    alert_direction = st.selectbox("Trigger when", ['above', 'below'], key="alert_dir")
-                    
-                    if st.button("➕ Add Alert"):
-                        alert_manager.add_alert(ticker, alert_metric, alert_threshold, alert_direction)
-                        st.success(f"Alert created for {ticker}")
-                
-                with col2:
-                    st.markdown("**Active Alerts**")
-                    alerts = alert_manager.get_alerts(ticker)
-                    if alerts:
-                        for alert in alerts:
-                            st.text(f"- {alert['name']}")
-                    else:
-                        st.caption("No active alerts for this ticker")
-            else:
-                st.info("Alerts module not available")
 
 # ============================================================================
 # PORTFOLIO MODE
@@ -1961,11 +1982,11 @@ else:
         enable_digital_twin = st.session_state.get('enable_digital_twin', False)
         enable_what_if = st.session_state.get('enable_what_if', False)
         
-        tab_list = ["Summary", "Monte Carlo", "Correlation", "Stress Test", "Optimization"]
+        tab_list = ["Summary", "Forecast", "Monte Carlo", "Correlation", "Stress Test", "Optimization"]
         
         if HAS_ENHANCED_UTILS:
             tab_list.append("Rebalancing")
-            tab_list.append("Risk Analytics")  # New v4.4 - Risk Score, Scenarios, Attribution
+            tab_list.append("Risk Analytics")  # Risk Score, Scenarios, Attribution
         
         if enable_digital_twin and HAS_DIGITAL_TWIN:
             tab_list.append("Digital Twin")
@@ -1992,7 +2013,7 @@ else:
             port_hvar = historical_var(port_rets, 1, conf_level)
             port_cvar = cvar(port_rets, conf_level)
             
-            # Risk Score Widget (v4.4)
+            # Risk Score Widget
             if HAS_ENHANCED_UTILS:
                 # Calculate correlation for risk score
                 corr_matrix = returns_df.corr()
@@ -2052,7 +2073,7 @@ else:
             
             st.markdown("---")
             
-            # Sector Exposure (v4.4)
+            # Sector Exposure
             if HAS_ENHANCED_UTILS:
                 weights_dict = {t: weights[t]/100 for t in tickers}
                 sector_exp = analyze_sector_exposure(returns_df, weights_dict)
@@ -2142,7 +2163,23 @@ else:
                     'Marginal Contribution': '{:.4f}'
                 }), use_container_width=True, hide_index=True)
         
-        # TAB 2: MONTE CARLO (NEW FOR PORTFOLIO)
+        # TAB: FORECAST - Future Growth Projections
+        with tabs[tab_idx]:
+            tab_idx += 1
+            try:
+                if HAS_FORECAST:
+                    render_forecast_tab(
+                        returns=returns_df,
+                        weights={t: weights[t]/100 for t in tickers},
+                        portfolio_value=100000
+                    )
+                else:
+                    st.warning("Forecast module not available. Install required dependencies.")
+            except Exception as e:
+                st.error(f"Forecast error: {e}")
+                st.info("Ensure the forecast module is properly installed.")
+        
+        # TAB: MONTE CARLO (NEW FOR PORTFOLIO)
         with tabs[tab_idx]:
             tab_idx += 1
             st.subheader("Portfolio Monte Carlo Simulation")
@@ -2464,7 +2501,7 @@ else:
                 st.dataframe(drift_df.style.format({'Drift': '{:.2f}%', 'Threshold': '{:.1f}%'}),
                            use_container_width=True, hide_index=True)
             
-            # TAB: RISK ANALYTICS (v4.4) - Historical Scenarios, VaR Backtest, Attribution, Network
+            # TAB: RISK ANALYTICS - Historical Scenarios, VaR Backtest, Attribution, Network
             with tabs[tab_idx]:
                 tab_idx += 1
                 st.subheader("Advanced Risk Analytics")
@@ -2620,7 +2657,7 @@ else:
                     col2.metric("Max Correlation", f"{max_corr:.2f}")
                     col3.metric("Min Correlation", f"{min_corr:.2f}")
         
-        # TAB: DIGITAL TWIN (v4.3) - if enabled
+        # TAB: DIGITAL TWIN - if enabled
         if enable_digital_twin and HAS_DIGITAL_TWIN:
             with tabs[tab_idx]:
                 tab_idx += 1
@@ -2634,7 +2671,7 @@ else:
                     st.error(f"Digital Twin error: {e}")
                     st.info("Check that the portfolio simulation engine is properly loaded.")
         
-        # TAB: WHAT-IF ANALYSIS (v4.3) - if enabled
+        # TAB: WHAT-IF ANALYSIS - if enabled
         if enable_what_if and HAS_WHAT_IF:
             with tabs[tab_idx]:
                 tab_idx += 1
@@ -2648,7 +2685,7 @@ else:
                     st.error(f"What-If Analysis error: {e}")
                     st.info("Check that the What-If analyzer is properly loaded.")
         
-        # TAB: PRESETS (v4.4) - Quick Portfolio Optimization Presets
+        # TAB: PRESETS - Quick Portfolio Optimization Presets
         if HAS_PORTFOLIO_BUILDER:
             with tabs[tab_idx]:
                 tab_idx += 1
@@ -2744,11 +2781,11 @@ else:
 st.markdown("---")
 enhanced_features = " | Risk Score | Scenarios | Factor Builder" if HAS_ENHANCED_UTILS else ""
 portfolio_builder = " | Presets | Risk Budget" if HAS_PORTFOLIO_BUILDER else ""
+forecast_feature = " | Growth Forecast" if HAS_FORECAST else ""
 st.markdown(f"""
-<div style='text-align: center; color: #8E8E93; font-size: 0.8rem;'>
-    Stock Risk Model v4.4 | Portfolio Analysis | Stress Testing | Factor Models | AI Risk | TA Signals<br>
-    Options Analytics | Fundamentals | VaR Backtest | Attribution{enhanced_features}{portfolio_builder}<br>
-    Built with Streamlit, XGBoost, GARCH, Fama-French | Local Analysis Only
+<div style='text-align: center; color: #6e7681; font-size: 0.7rem; font-family: monospace;'>
+    RISK MODEL | PORTFOLIO | STRESS TEST | FACTORS | AI{forecast_feature}{enhanced_features}{portfolio_builder}<br>
+    GARCH | MONTE CARLO | FAMA-FRENCH | LOCAL ANALYSIS
 </div>
 """, unsafe_allow_html=True)
 

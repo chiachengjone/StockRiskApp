@@ -1181,19 +1181,6 @@ def render_presets_tab(
             height=350
         )
         st.plotly_chart(fig, use_container_width=True)
-        
-        # Apply button
-        if st.button("Apply This Preset", type="primary"):
-            # Update loaded_weights so sliders reflect the new weights
-            st.session_state['loaded_weights'] = {
-                k: v * 100 for k, v in result['weights'].items()
-            }
-            # Also update what_if_weights for consistency
-            st.session_state['what_if_weights'] = {
-                k: v * 100 for k, v in result['weights'].items()
-            }
-            st.success("Preset applied! Weights updated - please re-run Analyze Portfolio.")
-            st.rerun()
     
     # Comparison chart of all presets
     st.markdown("---")
