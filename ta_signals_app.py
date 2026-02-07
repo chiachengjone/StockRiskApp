@@ -61,9 +61,7 @@ from services.regime_service import RegimeService, MarketRegime, VolatilityRegim
 from services.divergence_service import DivergenceService, DivergenceType
 from services.strategy_service import StrategyService
 from services.advanced_backtest_service import AdvancedBacktestService
-from services.alerts_service import AlertsService, AlertType, AlertPriority, AlertStatus
 from services.ta_sentiment_service import SentimentService, SentimentLevel
-from services.reporting_service import ReportingService, SignalOutcome
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -103,30 +101,70 @@ TIMEFRAMES = {
     '5y': '5 Years'
 }
 
-# Popular stocks for screener
-POPULAR_STOCKS = [
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B',
-    'UNH', 'JNJ', 'JPM', 'V', 'PG', 'XOM', 'HD', 'CVX', 'MA', 'ABBV',
-    'MRK', 'PEP', 'KO', 'COST', 'AVGO', 'LLY', 'WMT', 'TMO', 'MCD', 'CSCO',
-    'ACN', 'ABT', 'DHR', 'NEE', 'VZ', 'ADBE', 'CRM', 'NKE', 'INTC', 'AMD'
-]
-
-# Sector mapping
-SECTOR_MAPPING = {
-    'AAPL': 'Technology', 'MSFT': 'Technology', 'GOOGL': 'Technology',
-    'AMZN': 'Consumer Cyclical', 'NVDA': 'Technology', 'META': 'Technology',
-    'TSLA': 'Consumer Cyclical', 'BRK-B': 'Financial', 'UNH': 'Healthcare',
-    'JNJ': 'Healthcare', 'JPM': 'Financial', 'V': 'Financial',
-    'PG': 'Consumer Defensive', 'XOM': 'Energy', 'HD': 'Consumer Cyclical',
-    'CVX': 'Energy', 'MA': 'Financial', 'ABBV': 'Healthcare',
-    'MRK': 'Healthcare', 'PEP': 'Consumer Defensive', 'KO': 'Consumer Defensive',
-    'COST': 'Consumer Defensive', 'AVGO': 'Technology', 'LLY': 'Healthcare',
-    'WMT': 'Consumer Defensive', 'TMO': 'Healthcare', 'MCD': 'Consumer Cyclical',
-    'CSCO': 'Technology', 'ACN': 'Technology', 'ABT': 'Healthcare',
-    'DHR': 'Healthcare', 'NEE': 'Utilities', 'VZ': 'Communication',
-    'ADBE': 'Technology', 'CRM': 'Technology', 'NKE': 'Consumer Cyclical',
-    'INTC': 'Technology', 'AMD': 'Technology'
+# Popular stocks for screener - organized by sector
+POPULAR_STOCKS = {
+    'Technology': [
+        'AAPL', 'MSFT', 'GOOGL', 'NVDA', 'META', 'AVGO', 'CSCO', 'ACN',
+        'ADBE', 'CRM', 'INTC', 'AMD', 'ORCL', 'IBM', 'QCOM', 'TXN',
+        'NOW', 'AMAT', 'MU', 'LRCX', 'KLAC', 'SNPS', 'CDNS', 'PANW'
+    ],
+    'Healthcare': [
+        'UNH', 'JNJ', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'DHR',
+        'PFE', 'BMY', 'AMGN', 'GILD', 'VRTX', 'REGN', 'ISRG', 'MDT',
+        'SYK', 'BSX', 'ZTS', 'CI', 'HUM', 'CVS', 'MCK', 'ELV'
+    ],
+    'Financial': [
+        'BRK-B', 'JPM', 'V', 'MA', 'BAC', 'WFC', 'GS', 'MS',
+        'AXP', 'C', 'SPGI', 'BLK', 'SCHW', 'CB', 'MMC', 'AON',
+        'PGR', 'TRV', 'USB', 'PNC', 'CME', 'ICE', 'COF', 'AIG'
+    ],
+    'Consumer Cyclical': [
+        'AMZN', 'TSLA', 'HD', 'MCD', 'NKE', 'LOW', 'SBUX', 'TJX',
+        'BKNG', 'MAR', 'GM', 'F', 'ABNB', 'CMG', 'ORLY', 'AZO',
+        'ROST', 'DHI', 'LEN', 'PHM', 'POOL', 'ULTA', 'LULU', 'YUM'
+    ],
+    'Consumer Defensive': [
+        'PG', 'PEP', 'KO', 'COST', 'WMT', 'PM', 'MO', 'CL',
+        'MDLZ', 'GIS', 'K', 'KHC', 'STZ', 'SYY', 'KR', 'TGT',
+        'DG', 'DLTR', 'EL', 'HSY', 'TSN', 'HRL', 'CAG', 'MKC'
+    ],
+    'Energy': [
+        'XOM', 'CVX', 'COP', 'EOG', 'SLB', 'MPC', 'PSX', 'VLO',
+        'OXY', 'PXD', 'DVN', 'HES', 'HAL', 'BKR', 'FANG', 'KMI',
+        'WMB', 'OKE', 'TRGP', 'LNG', 'MRO', 'APA', 'EQT', 'CTRA'
+    ],
+    'Industrials': [
+        'CAT', 'DE', 'RTX', 'HON', 'UNP', 'BA', 'LMT', 'GE',
+        'UPS', 'FDX', 'MMM', 'CSX', 'NSC', 'ITW', 'EMR', 'ETN',
+        'GD', 'NOC', 'WM', 'RSG', 'CMI', 'PH', 'ROK', 'IR'
+    ],
+    'Utilities': [
+        'NEE', 'DUK', 'SO', 'D', 'AEP', 'SRE', 'EXC', 'XEL',
+        'ED', 'PEG', 'WEC', 'ES', 'AWK', 'DTE', 'ETR', 'FE',
+        'PPL', 'CMS', 'AEE', 'ATO', 'NI', 'LNT', 'EVRG', 'PNW'
+    ],
+    'Communication': [
+        'VZ', 'T', 'TMUS', 'CMCSA', 'NFLX', 'DIS', 'CHTR', 'WBD',
+        'EA', 'TTWO', 'ATVI', 'PARA', 'FOX', 'FOXA', 'NWS', 'NWSA',
+        'LUMN', 'DISH', 'IPG', 'OMC', 'LYV', 'MTCH', 'ZG', 'Z'
+    ],
+    'Real Estate': [
+        'AMT', 'PLD', 'CCI', 'EQIX', 'PSA', 'SPG', 'O', 'WELL',
+        'DLR', 'AVB', 'EQR', 'VTR', 'ARE', 'MAA', 'UDR', 'ESS',
+        'SUI', 'HST', 'PEAK', 'INVH', 'CPT', 'IRM', 'KIM', 'REG'
+    ],
+    'Materials': [
+        'LIN', 'APD', 'SHW', 'ECL', 'FCX', 'NEM', 'NUE', 'DD',
+        'DOW', 'PPG', 'VMC', 'MLM', 'ALB', 'CTVA', 'IFF', 'BALL',
+        'PKG', 'IP', 'CE', 'EMN', 'FMC', 'MOS', 'CF', 'LYB'
+    ]
 }
+
+# Flat list of all popular stocks
+ALL_POPULAR_STOCKS = [ticker for tickers in POPULAR_STOCKS.values() for ticker in tickers]
+
+# Sector mapping (reverse lookup)
+SECTOR_MAPPING = {ticker: sector for sector, tickers in POPULAR_STOCKS.items() for ticker in tickers}
 
 # Chart template
 CHART_CONFIG = {
@@ -853,92 +891,202 @@ def render_single_stock_analysis(
 
 
 def render_screener_mode(ta_service: TAService, signals_service: SignalsService) -> None:
-    """Render screener mode tab."""
+    """Render enhanced screener mode tab."""
     
-    st.markdown("### Stock Screener")
-    st.markdown("Scan multiple stocks for trading signals")
+    st.markdown("### 🔍 Stock Screener")
+    st.markdown("Scan stocks for trading signals by ticker, sector, or from popular lists")
     
-    col1, col2, col3 = st.columns([2, 1, 1])
+    # Stock source selection
+    st.markdown("#### Select Stock Source")
+    
+    source_tab1, source_tab2, source_tab3 = st.tabs([
+        "📝 Custom Tickers", 
+        "🏢 By Sector", 
+        "⭐ Popular Lists"
+    ])
+    
+    selected_tickers = []
+    
+    with source_tab1:
+        st.markdown("Enter any stock ticker(s) to scan:")
+        custom_input = st.text_area(
+            "Tickers (comma or space separated)",
+            placeholder="AAPL, MSFT, GOOGL, AMZN, TSLA...",
+            height=100,
+            key="screener_custom_tickers"
+        )
+        if custom_input:
+            # Parse tickers - handle both comma and space separated
+            raw_tickers = custom_input.replace(',', ' ').split()
+            selected_tickers = [t.strip().upper() for t in raw_tickers if t.strip()]
+    
+    with source_tab2:
+        st.markdown("Select stocks by sector:")
+        
+        # Show sector checkboxes with stock counts
+        col1, col2 = st.columns(2)
+        selected_sectors = []
+        
+        sectors = list(POPULAR_STOCKS.keys())
+        half = len(sectors) // 2
+        
+        with col1:
+            for sector in sectors[:half]:
+                count = len(POPULAR_STOCKS[sector])
+                if st.checkbox(f"{sector} ({count} stocks)", key=f"sector_{sector}"):
+                    selected_sectors.append(sector)
+        
+        with col2:
+            for sector in sectors[half:]:
+                count = len(POPULAR_STOCKS[sector])
+                if st.checkbox(f"{sector} ({count} stocks)", key=f"sector_{sector}"):
+                    selected_sectors.append(sector)
+        
+        # Add "Select All" option
+        if st.checkbox("Select All Sectors", key="select_all_sectors"):
+            selected_sectors = list(POPULAR_STOCKS.keys())
+        
+        # Build ticker list from selected sectors
+        for sector in selected_sectors:
+            selected_tickers.extend(POPULAR_STOCKS.get(sector, []))
+    
+    with source_tab3:
+        st.markdown("Quick select from popular stock lists:")
+        
+        preset_options = {
+            "Top 20 Overall": ALL_POPULAR_STOCKS[:20],
+            "Top 50 Overall": ALL_POPULAR_STOCKS[:50],
+            "Magnificent 7": ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA'],
+            "FAANG+": ['META', 'AAPL', 'AMZN', 'NFLX', 'GOOGL', 'MSFT', 'NVDA'],
+            "Top Tech": POPULAR_STOCKS.get('Technology', [])[:15],
+            "Top Healthcare": POPULAR_STOCKS.get('Healthcare', [])[:15],
+            "Top Financial": POPULAR_STOCKS.get('Financial', [])[:15],
+            "Top Consumer": POPULAR_STOCKS.get('Consumer Cyclical', [])[:10] + POPULAR_STOCKS.get('Consumer Defensive', [])[:10],
+            "Top Energy": POPULAR_STOCKS.get('Energy', [])[:15],
+            "Top Industrials": POPULAR_STOCKS.get('Industrials', [])[:15],
+            "Dividend Aristocrats": ['JNJ', 'PG', 'KO', 'PEP', 'MMM', 'MCD', 'ABT', 'XOM', 'CVX', 'WMT'],
+            "Growth Stocks": ['NVDA', 'TSLA', 'AMD', 'CRM', 'NOW', 'ADBE', 'PANW', 'SNOW', 'NET', 'DDOG'],
+            "All Stocks": ALL_POPULAR_STOCKS
+        }
+        
+        selected_preset = st.selectbox(
+            "Choose a preset list",
+            options=list(preset_options.keys()),
+            key="screener_preset"
+        )
+        
+        if selected_preset:
+            preset_tickers = preset_options[selected_preset]
+            st.info(f"📊 {len(preset_tickers)} stocks in '{selected_preset}'")
+            
+            # Show preview
+            with st.expander("Preview stocks in this list"):
+                st.write(", ".join(preset_tickers[:50]))
+                if len(preset_tickers) > 50:
+                    st.write(f"... and {len(preset_tickers) - 50} more")
+            
+            if st.checkbox("Use this list", value=True, key="use_preset"):
+                selected_tickers = preset_tickers
+    
+    # Remove duplicates
+    selected_tickers = list(dict.fromkeys(selected_tickers))
+    
+    st.markdown("---")
+    
+    # Signal and filter options
+    st.markdown("#### Filter Options")
+    
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        custom_tickers = st.text_input(
-            "Custom Tickers (comma-separated)",
-            placeholder="AAPL, MSFT, GOOGL",
-            key="screener_custom"
-        )
-    
-    with col2:
         signal_filter = st.multiselect(
-            "Signal Filter",
+            "Signal Types",
             options=["BUY", "SELL", "STRONG_BUY", "STRONG_SELL", "HOLD"],
             default=["BUY", "STRONG_BUY"],
             key="screener_signal_filter"
         )
     
+    with col2:
+        min_score = st.slider("Minimum Score", 0, 100, 50, key="min_score")
+    
     with col3:
-        sector_filter = st.selectbox(
-            "Sector Filter",
-            options=["All"] + list(set(SECTOR_MAPPING.values())),
-            key="screener_sector"
+        max_stocks = st.number_input(
+            "Max Stocks to Scan",
+            min_value=1,
+            max_value=300,
+            value=min(100, len(selected_tickers)) if selected_tickers else 50,
+            key="max_stocks"
         )
     
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        use_popular = st.checkbox("Include Popular Stocks", value=True, key="use_popular")
-    with col2:
-        min_score = st.slider("Minimum Signal Score", 0, 100, 50, key="min_score")
+    # Risk filters
+    with st.expander("Risk Filters (Optional)"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            max_volatility = st.slider("Max Volatility %", 0, 100, 50, key="max_vol")
+        with col2:
+            max_beta = st.slider("Max Beta", 0.0, 3.0, 2.0, 0.1, key="max_beta")
+        with col3:
+            min_sharpe = st.slider("Min Sharpe Ratio", -2.0, 3.0, 0.0, 0.1, key="min_sharpe")
     
-    scan_btn = st.button("Scan Stocks", type="primary", key="scan_btn")
+    # Show current selection count
+    if selected_tickers:
+        st.info(f"📋 Ready to scan {min(len(selected_tickers), int(max_stocks))} stocks")
+    
+    # Scan button
+    scan_btn = st.button("🔍 Scan Stocks", type="primary", key="scan_btn", use_container_width=True)
     
     if scan_btn:
-        # Build ticker list
-        tickers = []
-        
-        if custom_tickers:
-            tickers.extend([t.strip().upper() for t in custom_tickers.split(",")])
-        
-        if use_popular:
-            # Filter by sector if selected
-            if sector_filter != "All":
-                tickers.extend([t for t, s in SECTOR_MAPPING.items() if s == sector_filter])
-            else:
-                tickers.extend(POPULAR_STOCKS[:20])
-        
-        tickers = list(set(tickers))  # Remove duplicates
-        
-        if not tickers:
-            st.warning("Please enter tickers or enable Popular Stocks")
+        if not selected_tickers:
+            st.warning("Please select stocks to scan using one of the tabs above")
             return
+        
+        if not signal_filter:
+            st.warning("Please select at least one signal type to filter")
+            return
+        
+        # Limit tickers
+        tickers_to_scan = selected_tickers[:int(max_stocks)]
         
         # Progress
         progress = st.progress(0)
         status = st.empty()
         
         results = []
+        errors = 0
         
-        for i, ticker in enumerate(tickers):
-            status.text(f"Scanning {ticker}... ({i+1}/{len(tickers)})")
-            progress.progress((i + 1) / len(tickers))
+        for i, ticker in enumerate(tickers_to_scan):
+            status.text(f"Scanning {ticker}... ({i+1}/{len(tickers_to_scan)})")
+            progress.progress((i + 1) / len(tickers_to_scan))
             
             try:
                 df = fetch_stock_data(ticker, "1y")
                 
                 if df.empty or len(df) < 50:
+                    errors += 1
                     continue
                 
                 # Get current signal
                 score, signal_type, reason = signals_service.get_current_signal(ticker, df)
                 
-                # Apply filters
+                # Apply signal filter
                 if signal_type.value not in signal_filter:
                     continue
                 
+                # Apply score filter
                 if score < min_score:
                     continue
                 
                 # Calculate risk
                 close = df['Close'] if not isinstance(df['Close'], pd.DataFrame) else df['Close'].iloc[:, 0]
                 risk = calculate_risk_metrics(close)
+                
+                # Apply risk filters
+                if risk.volatility * 100 > max_volatility:
+                    continue
+                if hasattr(risk, 'beta') and risk.beta > max_beta:
+                    continue
+                if risk.sharpe < min_sharpe:
+                    continue
                 
                 # Get price info
                 current_price = float(close.iloc[-1])
@@ -947,18 +1095,19 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
                 
                 results.append({
                     'Symbol': ticker,
+                    'Sector': SECTOR_MAPPING.get(ticker, 'Other'),
                     'Price': f"${current_price:.2f}",
                     'Change': f"{change_pct:+.2f}%",
                     'Signal': signal_type.value,
                     'Score': score,
-                    'Reason': reason[:50] + "..." if len(reason) > 50 else reason,
+                    'Reason': reason[:40] + "..." if len(reason) > 40 else reason,
                     'Volatility': f"{risk.volatility*100:.1f}%",
-                    'Sharpe': f"{risk.sharpe:.2f}",
-                    'Sector': SECTOR_MAPPING.get(ticker, 'Unknown')
+                    'Sharpe': f"{risk.sharpe:.2f}"
                 })
                 
             except Exception as e:
                 logger.error(f"Error scanning {ticker}: {e}")
+                errors += 1
                 continue
         
         progress.empty()
@@ -966,10 +1115,23 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
         
         if results:
             st.success(f"Found {len(results)} stocks matching criteria")
+            if errors > 0:
+                st.caption(f"({errors} stocks skipped due to insufficient data)")
             
             # Sort by score
             results_df = pd.DataFrame(results)
             results_df = results_df.sort_values('Score', ascending=False)
+            
+            # Signal color mapping
+            def signal_color(val):
+                colors = {
+                    'STRONG_BUY': 'background-color: #00C853; color: white',
+                    'BUY': 'background-color: #34C759; color: white',
+                    'HOLD': 'background-color: #FF9500; color: white',
+                    'SELL': 'background-color: #FF3B30; color: white',
+                    'STRONG_SELL': 'background-color: #FF1744; color: white'
+                }
+                return colors.get(val, '')
             
             st.dataframe(
                 results_df,
@@ -981,11 +1143,23 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
                         min_value=0,
                         max_value=100,
                         format='%.0f'
-                    )
+                    ),
+                    'Symbol': st.column_config.TextColumn('Symbol', width='small'),
+                    'Sector': st.column_config.TextColumn('Sector', width='medium'),
+                    'Signal': st.column_config.TextColumn('Signal', width='small')
                 }
             )
+            
+            # Export option
+            csv = results_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Results (CSV)",
+                data=csv,
+                file_name="screener_results.csv",
+                mime="text/csv"
+            )
         else:
-            st.info("No stocks found matching the criteria")
+            st.info("No stocks found matching the criteria. Try adjusting your filters.")
 
 
 def render_backtest_module(ta_service: TAService, signals_service: SignalsService) -> None:
@@ -1673,377 +1847,6 @@ def render_market_regime(regime_service: RegimeService) -> None:
         st.info(implications.get(result.market_regime, "Monitor market conditions closely."))
 
 
-def render_alerts_manager(alerts_service: AlertsService) -> None:
-    """Render alerts management tab."""
-    
-    st.markdown("### 🔔 Smart Alerts Manager")
-    st.markdown("Create and manage technical analysis alerts")
-    
-    # Tabs for create/view
-    alert_tab1, alert_tab2, alert_tab3 = st.tabs(["Create Alert", "Active Alerts", "History"])
-    
-    with alert_tab1:
-        st.markdown("#### Create New Alert")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            alert_symbol = st.text_input("Symbol", value="AAPL", key="alert_symbol").upper()
-            alert_name = st.text_input("Alert Name", f"My {alert_symbol} Alert", key="alert_name")
-        
-        with col2:
-            alert_type = st.selectbox(
-                "Alert Type",
-                options=[
-                    "Price Above", "Price Below", "RSI Oversold", "RSI Overbought",
-                    "MACD Bullish", "MACD Bearish", "Golden Cross", "Volume Spike"
-                ],
-                key="alert_type"
-            )
-            
-            alert_priority = st.selectbox(
-                "Priority",
-                options=["Low", "Medium", "High", "Critical"],
-                index=1,
-                key="alert_priority"
-            )
-        
-        # Threshold based on alert type
-        if "Price" in alert_type:
-            threshold = st.number_input("Price Threshold ($)", value=150.0, key="alert_threshold")
-        elif "RSI" in alert_type:
-            default_val = 30.0 if "Oversold" in alert_type else 70.0
-            threshold = st.number_input("RSI Threshold", value=default_val, min_value=0.0, max_value=100.0, key="alert_threshold")
-        elif "Volume" in alert_type:
-            threshold = st.number_input("Volume Multiplier", value=2.0, min_value=1.0, key="alert_threshold")
-        else:
-            threshold = 0.0
-        
-        if st.button("Create Alert", type="primary", key="create_alert_btn"):
-            # Map alert type string to enum
-            type_mapping = {
-                "Price Above": AlertType.PRICE_ABOVE,
-                "Price Below": AlertType.PRICE_BELOW,
-                "RSI Oversold": AlertType.RSI_OVERSOLD,
-                "RSI Overbought": AlertType.RSI_OVERBOUGHT,
-                "MACD Bullish": AlertType.MACD_BULLISH,
-                "MACD Bearish": AlertType.MACD_BEARISH,
-                "Golden Cross": AlertType.GOLDEN_CROSS,
-                "Volume Spike": AlertType.VOLUME_SPIKE
-            }
-            
-            priority_mapping = {
-                "Low": AlertPriority.LOW,
-                "Medium": AlertPriority.MEDIUM,
-                "High": AlertPriority.HIGH,
-                "Critical": AlertPriority.CRITICAL
-            }
-            
-            from services.alerts_service import AlertCondition
-            
-            condition = AlertCondition(
-                alert_type=type_mapping[alert_type],
-                symbol=alert_symbol,
-                threshold=threshold
-            )
-            
-            alert = alerts_service.create_alert(
-                name=alert_name,
-                conditions=[condition],
-                priority=priority_mapping[alert_priority]
-            )
-            
-            st.success(f"Alert created: {alert.name} (ID: {alert.id})")
-    
-    with alert_tab2:
-        st.markdown("#### Active Alerts")
-        
-        active_alerts = alerts_service.get_alerts(status=AlertStatus.ACTIVE)
-        
-        if active_alerts:
-            for alert in active_alerts[:20]:
-                priority_colors = {
-                    AlertPriority.LOW: '#8E8E93',
-                    AlertPriority.MEDIUM: '#FF9500',
-                    AlertPriority.HIGH: '#FF3B30',
-                    AlertPriority.CRITICAL: '#FF1744'
-                }
-                color = priority_colors.get(alert.priority, '#8E8E93')
-                
-                st.markdown(f"""
-                <div style="
-                    background: rgba(30, 35, 45, 0.6);
-                    padding: 12px 16px;
-                    border-radius: 8px;
-                    margin-bottom: 8px;
-                    border-left: 3px solid {color};
-                ">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600;">{alert.name}</span>
-                        <span style="color: {color}; font-size: 12px; text-transform: uppercase;">{alert.priority.value}</span>
-                    </div>
-                    <div style="color: #a0a0a0; font-size: 13px; margin-top: 4px;">
-                        ID: {alert.id} | Triggers: {alert.trigger_count}/{alert.max_triggers if alert.max_triggers > 0 else '∞'}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("No active alerts. Create one in the 'Create Alert' tab.")
-    
-    with alert_tab3:
-        st.markdown("#### Alert History")
-        
-        history = alerts_service.get_trigger_history(limit=50)
-        
-        if history:
-            history_data = []
-            for trigger in history:
-                history_data.append({
-                    'Time': trigger.triggered_at.strftime('%Y-%m-%d %H:%M'),
-                    'Symbol': trigger.symbol,
-                    'Alert': trigger.alert_name,
-                    'Type': trigger.condition_type.value.replace('_', ' ').title(),
-                    'Price': f"${trigger.price_at_trigger:.2f}",
-                    'Priority': trigger.priority.value.title()
-                })
-            
-            st.dataframe(pd.DataFrame(history_data), use_container_width=True, hide_index=True)
-        else:
-            st.info("No triggered alerts yet.")
-        
-        # Statistics
-        stats = alerts_service.get_alert_statistics()
-        
-        st.markdown("---")
-        st.markdown("#### Alert Statistics")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total Alerts", stats['total_alerts'])
-        with col2:
-            st.metric("Active", stats['active'])
-        with col3:
-            st.metric("Triggered", stats['triggered'])
-        with col4:
-            st.metric("Total Triggers", stats['total_triggers'])
-
-
-def render_performance_reports(reporting_service: ReportingService) -> None:
-    """Render performance reporting tab."""
-    
-    st.markdown("### 📋 Performance Reports")
-    st.markdown("Track signal performance and generate reports")
-    
-    # Tabs for different views
-    report_tab1, report_tab2, report_tab3, report_tab4 = st.tabs([
-        "Record Signal", "Signal History", "Report Card", "Export"
-    ])
-    
-    with report_tab1:
-        st.markdown("#### Record New Signal")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            symbol = st.text_input("Symbol", value="AAPL", key="report_symbol").upper()
-            signal_type = st.selectbox("Signal Type", ["BUY", "SELL"], key="report_signal_type")
-            entry_price = st.number_input("Entry Price ($)", value=150.0, min_value=0.01, key="report_entry")
-        
-        with col2:
-            signal_source = st.selectbox(
-                "Signal Source",
-                ["RSI_Oversold", "RSI_Overbought", "MACD_Cross", "MA_Crossover", 
-                 "Pattern", "Bollinger", "Manual"],
-                key="report_source"
-            )
-            target_price = st.number_input("Target Price ($)", value=160.0, min_value=0.01, key="report_target")
-            stop_loss = st.number_input("Stop Loss ($)", value=145.0, min_value=0.01, key="report_stop")
-        
-        confidence = st.slider("Confidence", 0.0, 1.0, 0.7, 0.1, key="report_confidence")
-        notes = st.text_area("Notes", "", key="report_notes")
-        
-        if st.button("Record Signal", type="primary", key="record_signal_btn"):
-            signal = reporting_service.record_signal(
-                symbol=symbol,
-                signal_type=signal_type,
-                signal_source=signal_source,
-                entry_price=entry_price,
-                target_price=target_price,
-                stop_loss=stop_loss,
-                confidence=confidence,
-                notes=notes
-            )
-            st.success(f"Signal recorded: {signal.signal_type} {signal.symbol} (ID: {signal.id})")
-    
-    with report_tab2:
-        st.markdown("#### Signal History")
-        
-        # Filters
-        col1, col2 = st.columns(2)
-        with col1:
-            filter_symbol = st.text_input("Filter by Symbol (optional)", "", key="history_filter_symbol")
-        with col2:
-            filter_outcome = st.selectbox(
-                "Filter by Outcome",
-                ["All", "Pending", "Win", "Loss", "Breakeven"],
-                key="history_filter_outcome"
-            )
-        
-        # Get signals
-        outcome_map = {
-            "All": None,
-            "Pending": SignalOutcome.PENDING,
-            "Win": SignalOutcome.WIN,
-            "Loss": SignalOutcome.LOSS,
-            "Breakeven": SignalOutcome.BREAKEVEN
-        }
-        
-        signals = reporting_service.get_signal_history(
-            symbol=filter_symbol if filter_symbol else None,
-            outcome=outcome_map[filter_outcome]
-        )
-        
-        if signals:
-            signal_data = []
-            for s in signals:
-                outcome_emoji = {
-                    SignalOutcome.WIN: '🟢',
-                    SignalOutcome.LOSS: '🔴',
-                    SignalOutcome.BREAKEVEN: '⚪',
-                    SignalOutcome.PENDING: '⏳',
-                    SignalOutcome.EXPIRED: '⌛'
-                }
-                
-                signal_data.append({
-                    'ID': s.id,
-                    'Symbol': s.symbol,
-                    'Type': s.signal_type,
-                    'Source': s.signal_source,
-                    'Entry': f"${s.entry_price:.2f}",
-                    'Exit': f"${s.exit_price:.2f}" if s.exit_price else '-',
-                    'P&L': f"{s.pnl_pct:+.1f}%" if s.pnl_pct != 0 else '-',
-                    'Outcome': f"{outcome_emoji.get(s.outcome, '')} {s.outcome.value.title()}",
-                    'Date': s.entry_date.strftime('%Y-%m-%d')
-                })
-            
-            st.dataframe(pd.DataFrame(signal_data), use_container_width=True, hide_index=True)
-            
-            # Close signal form
-            st.markdown("---")
-            st.markdown("#### Close an Open Signal")
-            
-            open_signals = reporting_service.get_open_signals()
-            if open_signals:
-                signal_options = {f"{s.id} - {s.symbol} {s.signal_type}": s.id for s in open_signals}
-                selected = st.selectbox("Select Signal", list(signal_options.keys()), key="close_signal_select")
-                exit_price = st.number_input("Exit Price ($)", value=150.0, min_value=0.01, key="close_exit_price")
-                
-                if st.button("Close Signal", key="close_signal_btn"):
-                    closed = reporting_service.close_signal(signal_options[selected], exit_price)
-                    if closed:
-                        st.success(f"Signal closed: {closed.outcome.value} ({closed.pnl_pct:+.1f}%)")
-                        st.rerun()
-        else:
-            st.info("No signals recorded yet. Record a signal in the 'Record Signal' tab.")
-    
-    with report_tab3:
-        st.markdown("#### Performance Report Card")
-        
-        if st.button("Generate Report", type="primary", key="generate_report_btn"):
-            report = reporting_service.generate_report_card()
-            
-            # Overall metrics
-            st.markdown("##### Overall Performance")
-            metrics = report.overall_metrics
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Total Signals", metrics.total_signals)
-            with col2:
-                st.metric("Win Rate", f"{metrics.win_rate:.1f}%")
-            with col3:
-                st.metric("Profit Factor", f"{metrics.profit_factor:.2f}")
-            with col4:
-                st.metric("Total Return", f"{metrics.total_return_pct:+.1f}%")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Winning Trades", metrics.winning_signals)
-            with col2:
-                st.metric("Losing Trades", metrics.losing_signals)
-            with col3:
-                st.metric("Avg Win", f"{metrics.avg_win_pct:+.1f}%")
-            with col4:
-                st.metric("Avg Loss", f"{metrics.avg_loss_pct:.1f}%")
-            
-            # Recommendations
-            st.markdown("---")
-            st.markdown("##### Recommendations")
-            
-            for rec in report.recommendations:
-                st.markdown(f"- {rec}")
-            
-            # By source
-            if report.by_source:
-                st.markdown("---")
-                st.markdown("##### Performance by Signal Source")
-                
-                source_data = []
-                for source, m in report.by_source.items():
-                    source_data.append({
-                        'Source': source,
-                        'Signals': m.total_signals,
-                        'Win Rate': f"{m.win_rate:.1f}%",
-                        'Return': f"{m.total_return_pct:+.1f}%",
-                        'Profit Factor': f"{m.profit_factor:.2f}"
-                    })
-                
-                st.dataframe(pd.DataFrame(source_data), use_container_width=True, hide_index=True)
-    
-    with report_tab4:
-        st.markdown("#### Export Signals")
-        
-        export_format = st.selectbox("Export Format", ["CSV", "JSON"], key="export_format")
-        
-        if st.button("Export", type="primary", key="export_btn"):
-            if export_format == "CSV":
-                csv_data = reporting_service.export_to_csv()
-                st.download_button(
-                    label="Download CSV",
-                    data=csv_data,
-                    file_name="signal_history.csv",
-                    mime="text/csv"
-                )
-            else:
-                json_data = reporting_service.export_to_json()
-                st.download_button(
-                    label="Download JSON",
-                    data=json_data,
-                    file_name="signal_history.json",
-                    mime="application/json"
-                )
-        
-        # Summary stats
-        stats = reporting_service.get_summary_stats()
-        
-        st.markdown("---")
-        st.markdown("#### Quick Stats")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**All Time**")
-            st.markdown(f"- Signals: {stats['all_time']['total_signals']}")
-            st.markdown(f"- Win Rate: {stats['all_time']['win_rate']:.1f}%")
-            st.markdown(f"- Return: {stats['all_time']['total_return']:+.1f}%")
-        
-        with col2:
-            st.markdown("**Last 30 Days**")
-            st.markdown(f"- Signals: {stats['last_30_days']['total_signals']}")
-            st.markdown(f"- Win Rate: {stats['last_30_days']['win_rate']:.1f}%")
-            st.markdown(f"- Return: {stats['last_30_days']['total_return']:+.1f}%")
-
-
 # ============================================================================
 # MAIN RENDER FUNCTION
 # ============================================================================
@@ -2064,24 +1867,20 @@ def render_ta_signals() -> None:
     regime_service = RegimeService()
     divergence_service = DivergenceService()
     strategy_service = StrategyService()
-    alerts_service = AlertsService()
-    reporting_service = ReportingService()
     
     # Header
     st.markdown("## Technical Analysis Signals")
     st.markdown("Advanced technical indicators and signal generation")
     
-    # Tabs - Extended with new features
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+    # Tabs - Core features
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📈 Single Stock",
         "📊 Dashboard",
         "🔍 Screener",
         "⏱️ Backtest",
         "💼 Portfolio",
         "🕯️ Patterns",
-        "🌡️ Regime",
-        "🔔 Alerts",
-        "📋 Reports"
+        "🌡️ Regime"
     ])
     
     with tab1:
@@ -2105,12 +1904,6 @@ def render_ta_signals() -> None:
     
     with tab7:
         render_market_regime(regime_service)
-    
-    with tab8:
-        render_alerts_manager(alerts_service)
-    
-    with tab9:
-        render_performance_reports(reporting_service)
 
 
 # ============================================================================

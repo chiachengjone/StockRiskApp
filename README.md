@@ -45,18 +45,13 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 - **Parameter Optimization** - Grid search with sensitivity analysis
 - **Statistical Significance** - T-tests and Sharpe ratio difference tests
 
-### 🔔 Smart Alerts System
-- **Price Alerts** - Above/below/crossing price levels
-- **Indicator Alerts** - RSI overbought/oversold, MACD crossovers
-- **Pattern Alerts** - Golden Cross, Death Cross, BB Squeeze
-- **Volume Alerts** - Spike and drought detection
-- **Alert History** - Full trigger history with timestamps
-
-### 📋 Performance Reporting
-- **Signal Tracking** - Record entry/exit with outcomes
-- **Report Cards** - Win rate, profit factor, expectancy metrics
-- **Performance Attribution** - By source, symbol, time period
-- **Export** - CSV and JSON export of signal history
+### � Enhanced Stock Screener
+- **Any Ticker Search** - Scan any stock by entering ticker symbols
+- **Sector-Based Selection** - Choose from 11 sectors with 260+ stocks
+- **Popular Stock Lists** - Presets like Magnificent 7, FAANG+, Top Tech, Dividend Aristocrats
+- **Signal Filtering** - Filter by BUY, SELL, STRONG_BUY, STRONG_SELL, HOLD
+- **Risk Filters** - Optional volatility, beta, and Sharpe ratio filters
+- **Export Results** - Download screener results as CSV
 
 ### 💬 Sentiment Analysis
 - **Text Sentiment Scoring** - Keyword-based bullish/bearish analysis
@@ -281,16 +276,6 @@ TA Signals service modules:
 - Walk-forward analysis
 - Monte Carlo trade simulation
 - Parameter optimization grid search
-
-#### `services/alerts_service.py` (NEW)
-- Price and indicator alerts
-- Alert templates (RSI, MACD, Golden Cross)
-- Alert history tracking
-
-#### `services/reporting_service.py` (NEW)
-- Signal performance tracking
-- Report card generation
-- CSV/JSON export
 
 ### `utils/` (NEW in v4.1)
 Enhanced utilities package:
