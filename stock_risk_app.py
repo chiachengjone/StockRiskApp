@@ -41,7 +41,9 @@ from risk_engine import (
     # New functions
     rolling_volatility, rolling_sharpe, rolling_var, rolling_beta, 
     rolling_max_drawdown, get_rolling_metrics_df, monte_carlo_stress,
-    correlation_breakdown
+    correlation_breakdown,
+    # Data quality and VaR backtesting
+    validate_data_quality, DataQualityReport, backtest_var_model
 )
 from factors import FactorAnalyzer
 from ml_predictor import MLPredictor
@@ -726,6 +728,43 @@ if mode == "Single Stock":
             st.error(f"No data for {ticker}. Check ticker symbol.")
             st.stop()
         
+        # Data Quality Validation
+        data_quality = validate_data_quality(data, ticker)
+        if data_quality.score < 100:
+            with st.expander("Data Quality Report", expanded=data_quality.score < 70):
+                # Score display
+                if data_quality.score >= 90:
+                    score_color = "#34C759"  # Green
+                elif data_quality.score >= 70:
+                    score_color = "#FF9500"  # Orange
+                else:
+                    score_color = "#FF3B30"  # Red
+                
+                st.markdown(f"""
+                <div style="text-align: center; padding: 10px; background: {score_color}20; border-radius: 8px; margin-bottom: 10px;">
+                    <div style="font-size: 24px; font-weight: bold; color: {score_color};">{data_quality.score:.0f}/100</div>
+                    <div style="font-size: 12px; color: #888;">Data Quality Score</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Show issues
+                if data_quality.issues:
+                    st.markdown("**Issues:**")
+                    for issue in data_quality.issues:
+                        st.markdown(f"  {issue}")
+                
+                # Show warnings
+                if data_quality.warnings:
+                    st.markdown("**Warnings:**")
+                    for warning in data_quality.warnings:
+                        st.markdown(f"  {warning}")
+                
+                # Show recommendations
+                if data_quality.recommendations:
+                    st.markdown("**Recommendations:**")
+                    for rec in data_quality.recommendations:
+                        st.markdown(f"  • {rec}")
+        
         if bench_data.empty:
             st.warning(f"Benchmark {benchmark} not found. Using stock data only.")
             bench_data = data.copy()
@@ -964,51 +1003,119 @@ if mode == "Single Stock":
                 st.markdown("### VaR Model Backtesting")
                 st.info("Test how well VaR models predicted actual losses using Kupiec and Christoffersen tests.")
                 
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 with col1:
                     bt_confidence = st.selectbox("Backtest Confidence Level", [0.95, 0.99], index=0, key="var_bt_conf")
                 with col2:
                     bt_window = st.slider("Lookback Window", 60, 252, 126, key="var_bt_window")
+                with col3:
+                    bt_method = st.selectbox("VaR Method", ["historical", "parametric", "monte_carlo"], index=0, key="var_bt_method")
                 
                 if st.button("Run VaR Backtest", type="primary", key="run_var_backtest"):
                     with st.spinner("Running VaR backtest..."):
-                        # Calculate VaR series
-                        var_series = rets.rolling(bt_window).apply(
-                            lambda x: np.percentile(x, (1 - bt_confidence) * 100)
-                        )
-                        
-                        # Kupiec test
-                        kupiec = backtest_var_kupiec(rets, var_series, bt_confidence)
-                        
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric("Violations", kupiec['violations'])
-                        col2.metric("Expected Rate", f"{kupiec['expected_rate']*100:.1f}%")
-                        col3.metric("P-Value", f"{kupiec['p_value']:.4f}")
-                        
-                        # Check if model passed (p-value >= 0.05 means we fail to reject H0)
-                        if kupiec['p_value'] >= 0.05:
-                            st.success(f"VaR model PASSED Kupiec test at {bt_confidence:.0%} confidence")
-                        else:
-                            st.error(f"VaR model FAILED Kupiec test - model may be miscalibrated")
-                        
-                        # Show violations chart
-                        fig_bt = go.Figure()
-                        fig_bt.add_trace(go.Scatter(
-                            x=rets.index, y=rets.values * 100,
-                            mode='lines', name='Returns', line=dict(color='#2196F3', width=1)
-                        ))
-                        fig_bt.add_trace(go.Scatter(
-                            x=var_series.index, y=var_series.values * 100,
-                            mode='lines', name=f'VaR {bt_confidence:.0%}', 
-                            line=dict(color='#FF5722', width=2, dash='dash')
-                        ))
-                        fig_bt.update_layout(
-                            title="Returns vs VaR Threshold",
-                            xaxis_title="Date", yaxis_title="Return (%)",
-                            template='plotly_dark' if theme_dark else 'plotly_white',
-                            height=400
-                        )
-                        st.plotly_chart(fig_bt, use_container_width=True)
+                        # Use the new comprehensive backtest function
+                        try:
+                            backtest_result = backtest_var_model(
+                                returns=rets,
+                                var_method=bt_method,
+                                conf=bt_confidence,
+                                horizon=1,
+                                rolling_window=bt_window
+                            )
+                            
+                            # Traffic light indicator
+                            if backtest_result['model_adequate']:
+                                status_emoji = ""
+                                status_text = "PASS"
+                                status_color = "#34C759"
+                            elif backtest_result['kupiec_pass'] or (backtest_result['christoffersen_pass'] is None or backtest_result['christoffersen_pass']):
+                                status_emoji = ""
+                                status_text = "QUESTIONABLE"
+                                status_color = "#FF9500"
+                            else:
+                                status_emoji = ""
+                                status_text = "FAIL"
+                                status_color = "#FF3B30"
+                            
+                            st.markdown(f"""
+                            <div style="text-align: center; padding: 15px; background: {status_color}20; border-radius: 8px; margin-bottom: 20px;">
+                                <div style="font-size: 48px;">{status_emoji}</div>
+                                <div style="font-size: 18px; font-weight: 600; color: {status_color};">{status_text}</div>
+                                <div style="font-size: 12px; color: #888; margin-top: 5px;">VaR Model Validation</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            col1, col2, col3, col4 = st.columns(4)
+                            col1.metric("Violations", f"{backtest_result['violations']} / {backtest_result['total_observations']}")
+                            col2.metric("Violation Rate", f"{backtest_result['violation_rate']:.2%}")
+                            col3.metric("Expected Rate", f"{backtest_result['expected_rate']:.2%}")
+                            col4.metric("Kupiec P-Value", f"{backtest_result['kupiec_pvalue']:.4f}")
+                            
+                            # Test results
+                            st.markdown("#### Test Results")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                kupiec_status = "PASS" if backtest_result['kupiec_pass'] else "FAIL"
+                                st.markdown(f"**Kupiec Test (Coverage):** {kupiec_status}")
+                                st.caption("Tests if violations match expected rate")
+                            with col2:
+                                if backtest_result['christoffersen_pvalue'] is not None:
+                                    christ_status = "PASS" if backtest_result['christoffersen_pass'] else "FAIL"
+                                    st.markdown(f"**Christoffersen Test (Independence):** {christ_status}")
+                                else:
+                                    st.markdown("**Christoffersen Test:** N/A")
+                                st.caption("Tests if violations are independent")
+                            
+                            if backtest_result['model_adequate']:
+                                st.success(f"VaR model is ADEQUATE at {bt_confidence:.0%} confidence")
+                            else:
+                                st.warning(f"VaR model may need recalibration")
+                            
+                            # Show violations chart
+                            var_forecasts = backtest_result['var_forecasts']
+                            actual_returns = backtest_result['actual_returns']
+                            test_dates = rets.index[bt_window:bt_window+len(var_forecasts)]
+                            
+                            fig_bt = go.Figure()
+                            fig_bt.add_trace(go.Scatter(
+                                x=test_dates, y=[r * 100 for r in actual_returns],
+                                mode='lines', name='Actual Returns', line=dict(color='#2196F3', width=1)
+                            ))
+                            fig_bt.add_trace(go.Scatter(
+                                x=test_dates, y=[v * 100 for v in var_forecasts],
+                                mode='lines', name=f'VaR {bt_confidence:.0%}', 
+                                line=dict(color='#FF5722', width=2, dash='dash')
+                            ))
+                            
+                            # Mark violations
+                            violations_idx = [i for i, v in enumerate(backtest_result['violations_series']) if v == 1]
+                            if violations_idx:
+                                fig_bt.add_trace(go.Scatter(
+                                    x=[test_dates[i] for i in violations_idx],
+                                    y=[actual_returns[i] * 100 for i in violations_idx],
+                                    mode='markers', name='Violations',
+                                    marker=dict(color='red', size=8, symbol='x')
+                                ))
+                            
+                            fig_bt.update_layout(
+                                title="Returns vs VaR Threshold (Out-of-Sample)",
+                                xaxis_title="Date", yaxis_title="Return (%)",
+                                template='plotly_dark' if theme_dark else 'plotly_white',
+                                height=400
+                            )
+                            st.plotly_chart(fig_bt, use_container_width=True)
+                            
+                        except Exception as e:
+                            st.error(f"Backtest failed: {str(e)}")
+                            # Fallback to original method
+                            var_series = rets.rolling(bt_window).apply(
+                                lambda x: np.percentile(x, (1 - bt_confidence) * 100)
+                            )
+                            kupiec = backtest_var_kupiec(rets, var_series, bt_confidence)
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("Violations", kupiec['violations'])
+                            col2.metric("Expected Rate", f"{kupiec['expected_rate']*100:.1f}%")
+                            col3.metric("P-Value", f"{kupiec['p_value']:.4f}")
         
         # TAB 4: MONTE CARLO
         with tab4:
@@ -1429,11 +1536,44 @@ if mode == "Single Stock":
                                 with st.spinner("Calculating confidence intervals..."):
                                     ci_result = ml_ensemble.predict_with_confidence(rets, prices, n_bootstrap=50)
                                     
-                                    if 'error' not in ci_result:
-                                        col1, col2, col3 = st.columns(3)
-                                        col1.metric("Mean VaR", f"{ci_result['mean_var']:.2%}")
-                                        col2.metric("95% CI Lower", f"{ci_result['ci_5']:.2%}")
-                                        col3.metric("95% CI Upper", f"{ci_result['ci_95']:.2%}")
+                                    if 'warning' not in ci_result:
+                                        col1, col2, col3, col4 = st.columns(4)
+                                        col1.metric("Predicted VaR", f"{ci_result['predicted_var']:.2%}")
+                                        col2.metric(f"{int(ci_result['confidence_level']*100)}% CI Lower", f"{ci_result['lower_bound']:.2%}")
+                                        col3.metric(f"{int(ci_result['confidence_level']*100)}% CI Upper", f"{ci_result['upper_bound']:.2%}")
+                                        col4.metric("Std Error", f"{ci_result['std_error']:.4f}")
+                                        
+                                        # Show interval visualization
+                                        fig_ci = go.Figure()
+                                        fig_ci.add_trace(go.Bar(
+                                            x=['VaR Estimate'],
+                                            y=[ci_result['predicted_var'] * 100],
+                                            error_y=dict(
+                                                type='data',
+                                                symmetric=False,
+                                                array=[(ci_result['upper_bound'] - ci_result['predicted_var']) * 100],
+                                                arrayminus=[(ci_result['predicted_var'] - ci_result['lower_bound']) * 100]
+                                            ),
+                                            marker_color=COLORS['primary']
+                                        ))
+                                        fig_ci.update_layout(
+                                            title=f"ML VaR with {int(ci_result['confidence_level']*100)}% Confidence Interval",
+                                            yaxis_title="VaR (%)",
+                                            template='plotly_dark' if theme_dark else 'plotly_white',
+                                            height=300
+                                        )
+                                        st.plotly_chart(fig_ci, use_container_width=True)
+                                        
+                                        # Distribution details
+                                        with st.expander("Prediction Distribution Details"):
+                                            dist = ci_result.get('prediction_distribution', {})
+                                            col1, col2, col3 = st.columns(3)
+                                            col1.metric("Distribution Mean", f"{dist.get('mean', 0):.2%}")
+                                            col2.metric("25th Percentile", f"{dist.get('q25', 0):.2%}")
+                                            col3.metric("75th Percentile", f"{dist.get('q75', 0):.2%}")
+                                            st.caption(f"Based on {ci_result['n_bootstrap']} bootstrap iterations using {ci_result['model_type']}")
+                                    else:
+                                        st.warning(ci_result.get('warning', 'Confidence interval calculation failed'))
                             else:
                                 st.error(ensemble.get('error', 'Ensemble prediction failed'))
             else:
@@ -1828,7 +1968,7 @@ if mode == "Single Stock":
                             
                             if pdf_bytes:
                                 st.download_button(
-                                    "⬇️ Download PDF Report",
+                                    "Download PDF Report",
                                     data=pdf_bytes,
                                     file_name=f"{ticker}_risk_report_{datetime.now().strftime('%Y%m%d')}.pdf",
                                     mime="application/pdf"

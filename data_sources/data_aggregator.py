@@ -17,6 +17,14 @@ from .base_provider import BaseDataProvider
 from .yahoo_provider import YahooProvider
 from .alpha_vantage_provider import AlphaVantageProvider
 
+# Import settings for priority configuration
+try:
+    from config.settings import DATA_SOURCES as CONFIG_DATA_SOURCES
+    HAS_CONFIG = True
+except ImportError:
+    CONFIG_DATA_SOURCES = {}
+    HAS_CONFIG = False
+
 # Import new professional providers (optional)
 try:
     from .polygon_provider import PolygonProvider
@@ -88,16 +96,33 @@ class DataAggregator:
         }
     
     def _build_provider_order(self) -> List[str]:
-        """Build provider priority order based on available APIs."""
-        order = []
+        """Build provider priority order based on config settings."""
+        if HAS_CONFIG and CONFIG_DATA_SOURCES:
+            # Use config priorities: lower number = higher priority
+            provider_priorities = []
+            for name in self.providers.keys():
+                if name in CONFIG_DATA_SOURCES:
+                    priority = CONFIG_DATA_SOURCES[name].get('priority', 99)
+                    enabled = CONFIG_DATA_SOURCES[name].get('enabled', True)
+                    # Only include enabled providers (yahoo always enabled)
+                    if enabled or name == 'yahoo':
+                        provider_priorities.append((name, priority))
+                else:
+                    # Provider not in config, add with low priority
+                    provider_priorities.append((name, 99))
+            
+            # Sort by priority (lower = higher priority)
+            provider_priorities.sort(key=lambda x: x[1])
+            order = [name for name, _ in provider_priorities]
+            self.logger.info(f"Provider order from config: {order}")
+            return order
         
-        # Professional APIs first (lower latency, higher reliability)
-        if 'polygon' in self.providers:
-            order.append('polygon')
+        # Fallback: Professional APIs first, then free sources
+        order = []
         if 'alpaca' in self.providers:
             order.append('alpaca')
-        
-        # Free sources as fallback
+        if 'polygon' in self.providers:
+            order.append('polygon')
         order.append('yahoo')
         if 'alpha_vantage' in self.providers and self.providers['alpha_vantage'].api_key:
             order.append('alpha_vantage')

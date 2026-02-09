@@ -203,6 +203,134 @@ class MLPredictor:
             'test_actual': y_test
         }
     
+    def predict_with_confidence(self, returns: pd.Series, prices: pd.Series,
+                               n_bootstrap: int = 100, confidence_level: float = 0.95) -> dict:
+        """
+        Predict VaR with confidence intervals using bootstrapping.
+        
+        Resamples the training data and fits multiple models to estimate
+        prediction uncertainty. Returns point estimate and confidence bounds.
+        
+        Args:
+            returns: Daily log returns
+            prices: Price series for RSI calculation
+            n_bootstrap: Number of bootstrap iterations
+            confidence_level: Confidence level for interval (e.g., 0.95)
+        
+        Returns:
+            Dictionary with prediction, lower/upper bounds, and uncertainty metrics
+        """
+        # Engineer features
+        df = self.engineer_features(returns, prices)
+        
+        if len(df) < 100:
+            base_var = float(returns.std() * 1.645)
+            return {
+                'predicted_var': base_var,
+                'lower_bound': base_var * 0.7,
+                'upper_bound': base_var * 1.3,
+                'confidence_level': confidence_level,
+                'std_error': base_var * 0.15,
+                'model_type': 'fallback_parametric',
+                'n_bootstrap': 0,
+                'warning': 'Insufficient data for bootstrap - using parametric estimate'
+            }
+        
+        # Features and target
+        feature_cols = [c for c in df.columns if c not in ['target', 'return']]
+        X = df[feature_cols].values
+        y = df['target'].values
+        
+        # Latest features for prediction
+        latest_features = X[-1:].reshape(1, -1)
+        
+        # Bootstrap predictions
+        predictions = []
+        n_samples = len(X) - 1  # Exclude latest for training
+        
+        for i in range(n_bootstrap):
+            # Resample with replacement (maintaining temporal structure via block bootstrap)
+            block_size = min(20, n_samples // 5)
+            n_blocks = n_samples // block_size
+            
+            indices = []
+            for _ in range(n_blocks):
+                start_idx = np.random.randint(0, n_samples - block_size)
+                indices.extend(range(start_idx, start_idx + block_size))
+            indices = np.array(indices[:n_samples])
+            
+            X_boot = X[indices]
+            y_boot = y[indices]
+            
+            # Train model on bootstrap sample
+            if HAS_XGBOOST:
+                model = XGBRegressor(
+                    n_estimators=50,  # Faster for bootstrap
+                    max_depth=4,
+                    learning_rate=0.1,
+                    subsample=0.8,
+                    random_state=i,
+                    verbosity=0
+                )
+            else:
+                model = GradientBoostingRegressor(
+                    n_estimators=50,
+                    max_depth=4,
+                    learning_rate=0.1,
+                    subsample=0.8,
+                    random_state=i
+                )
+            
+            try:
+                model.fit(X_boot, y_boot)
+                pred = model.predict(latest_features)[0]
+                predictions.append(pred * 1.645)  # Scale to 95% VaR
+            except Exception:
+                continue
+        
+        if len(predictions) < 10:
+            # Not enough successful bootstrap iterations
+            base_var = float(returns.std() * 1.645)
+            return {
+                'predicted_var': base_var,
+                'lower_bound': base_var * 0.7,
+                'upper_bound': base_var * 1.3,
+                'confidence_level': confidence_level,
+                'std_error': base_var * 0.15,
+                'model_type': 'fallback_parametric',
+                'n_bootstrap': len(predictions),
+                'warning': 'Bootstrap failed - using parametric estimate'
+            }
+        
+        predictions = np.array(predictions)
+        
+        # Calculate confidence interval
+        alpha = 1 - confidence_level
+        lower_bound = float(np.percentile(predictions, alpha/2 * 100))
+        upper_bound = float(np.percentile(predictions, (1 - alpha/2) * 100))
+        point_estimate = float(np.median(predictions))
+        std_error = float(np.std(predictions))
+        
+        return {
+            'predicted_var': point_estimate,
+            'lower_bound': lower_bound,
+            'upper_bound': upper_bound,
+            'interval_width': upper_bound - lower_bound,
+            'confidence_level': confidence_level,
+            'std_error': std_error,
+            'coefficient_of_variation': std_error / point_estimate if point_estimate > 0 else 0,
+            'model_type': 'xgboost' if HAS_XGBOOST else 'gradient_boosting',
+            'n_bootstrap': len(predictions),
+            'prediction_distribution': {
+                'mean': float(np.mean(predictions)),
+                'std': std_error,
+                'min': float(np.min(predictions)),
+                'max': float(np.max(predictions)),
+                'q25': float(np.percentile(predictions, 25)),
+                'q75': float(np.percentile(predictions, 75))
+            }
+        }
+    
     def predict_var_range(self, returns: pd.Series, prices: pd.Series, 
                          horizons: list = [1, 5, 10]) -> dict:
         """

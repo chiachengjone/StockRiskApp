@@ -893,16 +893,16 @@ def render_single_stock_analysis(
 def render_screener_mode(ta_service: TAService, signals_service: SignalsService) -> None:
     """Render enhanced screener mode tab."""
     
-    st.markdown("### 🔍 Stock Screener")
+    st.markdown("### Stock Screener")
     st.markdown("Scan stocks for trading signals by ticker, sector, or from popular lists")
     
     # Stock source selection
     st.markdown("#### Select Stock Source")
     
     source_tab1, source_tab2, source_tab3 = st.tabs([
-        "📝 Custom Tickers", 
-        "🏢 By Sector", 
-        "⭐ Popular Lists"
+        "Custom Tickers", 
+        "By Sector", 
+        "Popular Lists"
     ])
     
     selected_tickers = []
@@ -977,7 +977,7 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
         
         if selected_preset:
             preset_tickers = preset_options[selected_preset]
-            st.info(f"📊 {len(preset_tickers)} stocks in '{selected_preset}'")
+            st.info(f"{len(preset_tickers)} stocks in '{selected_preset}'")
             
             # Show preview
             with st.expander("Preview stocks in this list"):
@@ -1030,10 +1030,10 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
     
     # Show current selection count
     if selected_tickers:
-        st.info(f"📋 Ready to scan {min(len(selected_tickers), int(max_stocks))} stocks")
+        st.info(f"Ready to scan {min(len(selected_tickers), int(max_stocks))} stocks")
     
     # Scan button
-    scan_btn = st.button("🔍 Scan Stocks", type="primary", key="scan_btn", use_container_width=True)
+    scan_btn = st.button("Scan Stocks", type="primary", key="scan_btn", use_container_width=True)
     
     if scan_btn:
         if not selected_tickers:
@@ -1643,7 +1643,7 @@ def render_signal_dashboard(ta_service: TAService, signals_service: SignalsServi
 def render_pattern_analysis(pattern_service: PatternService) -> None:
     """Render pattern recognition analysis tab."""
     
-    st.markdown("### 🕯️ Pattern Recognition")
+    st.markdown("### Pattern Recognition")
     st.markdown("Detect candlestick and chart patterns")
     
     col1, col2 = st.columns([2, 1])
@@ -1696,7 +1696,7 @@ def render_pattern_analysis(pattern_service: PatternService) -> None:
                 pattern_data.append({
                     'Date': p.end_date.strftime('%Y-%m-%d') if hasattr(p.end_date, 'strftime') else str(p.end_date)[:10],
                     'Pattern': p.pattern_type.value.replace('_', ' ').title(),
-                    'Direction': '🟢 Bullish' if p.direction == PatternDirection.BULLISH else ('🔴 Bearish' if p.direction == PatternDirection.BEARISH else '⚪ Neutral'),
+                    'Direction': 'Bullish' if p.direction == PatternDirection.BULLISH else ('Bearish' if p.direction == PatternDirection.BEARISH else 'Neutral'),
                     'Reliability': f"{p.reliability.value.title()}",
                     'Confidence': f"{p.confidence:.0f}%"
                 })
@@ -1710,7 +1710,7 @@ def render_pattern_analysis(pattern_service: PatternService) -> None:
         
         if chart_patterns:
             for p in chart_patterns[-5:]:  # Last 5 chart patterns
-                direction_emoji = '🟢' if p.direction == PatternDirection.BULLISH else ('🔴' if p.direction == PatternDirection.BEARISH else '⚪')
+                direction_label = 'Bullish' if p.direction == PatternDirection.BULLISH else ('Bearish' if p.direction == PatternDirection.BEARISH else 'Neutral')
                 st.markdown(f"""
                 <div style="
                     background: rgba(30, 35, 45, 0.6);
@@ -1719,7 +1719,7 @@ def render_pattern_analysis(pattern_service: PatternService) -> None:
                     margin-bottom: 8px;
                     border-left: 3px solid {'#34C759' if p.direction == PatternDirection.BULLISH else '#FF3B30'};
                 ">
-                    <div style="font-weight: 600;">{direction_emoji} {p.pattern_type.value.replace('_', ' ').title()}</div>
+                    <div style="font-weight: 600;">[{direction_label}] {p.pattern_type.value.replace('_', ' ').title()}</div>
                     <div style="color: #a0a0a0; font-size: 13px; margin-top: 4px;">
                         Detected at ${p.price_at_detection:.2f} | Reliability: {p.reliability.value.title()}
                     </div>
@@ -1732,7 +1732,7 @@ def render_pattern_analysis(pattern_service: PatternService) -> None:
 def render_market_regime(regime_service: RegimeService) -> None:
     """Render market regime detection tab."""
     
-    st.markdown("### 🌡️ Market Regime Detection")
+    st.markdown("### Market Regime Detection")
     st.markdown("Identify current market conditions and volatility regime")
     
     col1, col2 = st.columns([2, 1])
@@ -1837,11 +1837,11 @@ def render_market_regime(regime_service: RegimeService) -> None:
         st.markdown("#### Trading Implications")
         
         implications = {
-            MarketRegime.BULL: "🟢 Favor long positions. Consider trend-following strategies with trailing stops.",
-            MarketRegime.BEAR: "🔴 Exercise caution with long positions. Consider hedging or short opportunities.",
-            MarketRegime.SIDEWAYS: "⚪ Range-bound market. Consider mean-reversion strategies.",
-            MarketRegime.CRASH: "🔴 High risk environment. Reduce exposure and wait for stabilization.",
-            MarketRegime.RECOVERY: "🟢 Potential reversal. Look for early entry opportunities with tight stops."
+            MarketRegime.BULL: "[BULLISH] Favor long positions. Consider trend-following strategies with trailing stops.",
+            MarketRegime.BEAR: "[BEARISH] Exercise caution with long positions. Consider hedging or short opportunities.",
+            MarketRegime.SIDEWAYS: "[NEUTRAL] Range-bound market. Consider mean-reversion strategies.",
+            MarketRegime.CRASH: "[BEARISH] High risk environment. Reduce exposure and wait for stabilization.",
+            MarketRegime.RECOVERY: "[BULLISH] Potential reversal. Look for early entry opportunities with tight stops."
         }
         
         st.info(implications.get(result.market_regime, "Monitor market conditions closely."))
@@ -1874,13 +1874,13 @@ def render_ta_signals() -> None:
     
     # Tabs - Core features
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "📈 Single Stock",
-        "📊 Dashboard",
-        "🔍 Screener",
-        "⏱️ Backtest",
-        "💼 Portfolio",
-        "🕯️ Patterns",
-        "🌡️ Regime"
+        "Single Stock",
+        "Dashboard",
+        "Screener",
+        "Backtest",
+        "Portfolio",
+        "Patterns",
+        "Regime"
     ])
     
     with tab1:

@@ -16,6 +16,8 @@ from scipy.stats import norm, t, genpareto
 from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression
 from arch import arch_model
+from dataclasses import dataclass
+from typing import List
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -30,6 +32,14 @@ try:
     from config.settings import STRESS_SCENARIOS as CONFIG_SCENARIOS
 except ImportError:
     CONFIG_SCENARIOS = None
+
+# Import data source configuration
+try:
+    from config.settings import DATA_SOURCES as CONFIG_DATA_SOURCES
+    HAS_DATA_CONFIG = True
+except ImportError:
+    CONFIG_DATA_SOURCES = {}
+    HAS_DATA_CONFIG = False
 
 # ============================================================================
 # STRESS SCENARIOS
@@ -48,11 +58,63 @@ else:
     }
 
 # ============================================================================
+# DATA LAYER INTEGRATION
+# ============================================================================
+def get_data_aggregator():
+    """Get DataAggregator instance with API keys from config."""
+    if HAS_DATA_LAYER:
+        # Load API keys from config
+        alpaca_key = ''
+        alpaca_secret = ''
+        alpha_vantage_key = ''
+        polygon_key = ''
+        
+        if HAS_DATA_CONFIG and CONFIG_DATA_SOURCES:
+            alpaca_cfg = CONFIG_DATA_SOURCES.get('alpaca', {})
+            alpaca_key = alpaca_cfg.get('api_key', '')
+            alpaca_secret = alpaca_cfg.get('api_secret', '')
+            
+            av_cfg = CONFIG_DATA_SOURCES.get('alpha_vantage', {})
+            alpha_vantage_key = av_cfg.get('api_key', '')
+            
+            polygon_cfg = CONFIG_DATA_SOURCES.get('polygon', {})
+            polygon_key = polygon_cfg.get('api_key', '')
+        
+        return DataAggregator(
+            alpha_vantage_key=alpha_vantage_key,
+            polygon_key=polygon_key,
+            alpaca_key=alpaca_key,
+            alpaca_secret=alpaca_secret
+        )
+    return None
+
+# ============================================================================
 # DATA FETCHERS
 # ============================================================================
+# Global aggregator instance (lazy initialization)
+_data_aggregator = None
+
+def _get_aggregator():
+    """Lazy initialization of DataAggregator."""
+    global _data_aggregator
+    if _data_aggregator is None:
+        _data_aggregator = get_data_aggregator()
+    return _data_aggregator
+
 @st.cache_data(ttl=300)
 def fetch_data(ticker: str, start: str, end: str, interval: str = "1d") -> pd.DataFrame:
-    """Yahoo Finance data fetcher."""
+    """Fetch data using DataAggregator (Alpaca primary) with yfinance fallback."""
+    aggregator = _get_aggregator()
+    
+    if aggregator:
+        try:
+            data, source = aggregator.fetch_historical(ticker, start, end, interval)
+            if not data.empty:
+                return data
+        except Exception:
+            pass  # Fall through to yfinance
+    
+    # Fallback to direct yfinance
     try:
         data = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False, interval=interval)
         if data.empty:
@@ -86,6 +148,116 @@ def validate_ticker(ticker: str) -> bool:
         return info.get('regularMarketPrice') is not None or info.get('previousClose') is not None
     except:
         return False
+
+# ============================================================================
+# DATA QUALITY VALIDATION
+# ============================================================================
+@dataclass
+class DataQualityReport:
+    """Data quality assessment report."""
+    is_valid: bool
+    score: float  # 0-100
+    warnings: List[str]
+    issues: List[str]
+    recommendations: List[str]
+
+def validate_data_quality(df: pd.DataFrame, ticker: str = "") -> DataQualityReport:
+    """
+    Comprehensive data quality checks.
+    
+    Checks:
+    - Missing data
+    - Outliers
+    - Zero/negative prices
+    - Suspicious gaps
+    - Volume anomalies
+    
+    Args:
+        df: OHLCV DataFrame
+        ticker: Stock symbol for reporting
+        
+    Returns:
+        DataQualityReport with validation results
+    """
+    warnings_list = []
+    issues = []
+    recommendations = []
+    score = 100.0
+    
+    # Check 1: Empty data
+    if df.empty:
+        issues.append("[ERROR] No data returned")
+        return DataQualityReport(False, 0, warnings_list, issues, ["Check ticker symbol"])
+    
+    # Check 2: Sufficient data
+    if len(df) < 100:
+        warnings_list.append(f"[WARNING] Limited data ({len(df)} days). Minimum 100 recommended.")
+        score -= 10
+        recommendations.append("Use a longer time period for better accuracy")
+    
+    # Check 3: Missing data
+    missing_pct = df.isnull().sum().sum() / (len(df) * len(df.columns)) * 100
+    if missing_pct > 5:
+        issues.append(f"[ERROR] {missing_pct:.1f}% missing data (threshold: 5%)")
+        score -= 30
+        recommendations.append("Fill missing data or extend date range")
+    elif missing_pct > 1:
+        warnings_list.append(f"[WARNING] {missing_pct:.1f}% missing data")
+        score -= 10
+    
+    # Check 4: Outliers (single-day moves > 50%)
+    if 'Close' in df.columns:
+        returns = df['Close'].pct_change()
+        extreme_moves = (returns.abs() > 0.50).sum()
+        if extreme_moves > 0:
+            issues.append(f"[ERROR] {extreme_moves} extreme single-day movements (>50%)")
+            score -= 20
+            recommendations.append("Check for stock splits or data errors")
+    
+    # Check 5: Zero or negative prices
+    price_cols = [c for c in ['Open', 'High', 'Low', 'Close'] if c in df.columns]
+    if price_cols and (df[price_cols] <= 0).any().any():
+        issues.append("[ERROR] Zero or negative prices detected")
+        score -= 40
+        recommendations.append("Data corruption detected - use different source")
+    
+    # Check 6: Suspicious gaps (missing trading days)
+    if isinstance(df.index, pd.DatetimeIndex):
+        date_diffs = df.index.to_series().diff()
+        long_gaps = (date_diffs > pd.Timedelta(days=7)).sum()
+        if long_gaps > 2:
+            warnings_list.append(f"[WARNING] {long_gaps} gaps > 7 days detected")
+            score -= 5
+    
+    # Check 7: Volume anomalies
+    if 'Volume' in df.columns:
+        zero_volume_days = (df['Volume'] == 0).sum()
+        if zero_volume_days > len(df) * 0.1:  # 10% threshold
+            warnings_list.append(f"[WARNING] {zero_volume_days} days with zero volume")
+            score -= 10
+            recommendations.append("Low liquidity - consider using more liquid alternatives")
+    
+    # Check 8: Price consistency (High >= Low, Close within High/Low)
+    if all(c in df.columns for c in ['High', 'Low', 'Close']):
+        inconsistent_days = (
+            (df['High'] < df['Low']) | 
+            (df['Close'] > df['High']) | 
+            (df['Close'] < df['Low'])
+        ).sum()
+        if inconsistent_days > 0:
+            issues.append(f"[ERROR] {inconsistent_days} days with inconsistent OHLC data")
+            score -= 30
+            recommendations.append("Data corruption - verify with alternative source")
+    
+    is_valid = len(issues) == 0 and score >= 70
+    
+    return DataQualityReport(
+        is_valid=is_valid,
+        score=max(0, score),
+        warnings=warnings_list,
+        issues=issues,
+        recommendations=recommendations
+    )
 
 # ============================================================================
 # RETURN CALCULATIONS
@@ -160,6 +332,125 @@ def cvar(returns: pd.Series, conf: float = 0.95) -> float:
     var_threshold = np.percentile(returns, 100*(1-conf))
     tail_losses = returns[returns <= var_threshold]
     return float(tail_losses.mean()) if len(tail_losses) > 0 else 0.0
+
+def backtest_var_model(
+    returns: pd.Series, 
+    var_method: str = 'historical',
+    conf: float = 0.95,
+    horizon: int = 1,
+    rolling_window: int = 252
+) -> dict:
+    """
+    Backtest VaR model using rolling window.
+    
+    Performs out-of-sample validation of VaR forecasts using:
+    - Kupiec Test: Checks if violation rate matches confidence level
+    - Christoffersen Test: Checks if violations are independent
+    
+    Args:
+        returns: Historical returns series
+        var_method: 'parametric', 'historical', or 'monte_carlo'
+        conf: Confidence level (0.95 = 95%)
+        horizon: Forecast horizon in days
+        rolling_window: Number of days to use for VaR calculation
+        
+    Returns:
+        Dictionary with backtest statistics and test results
+    """
+    from scipy.stats import chi2
+    
+    violations = []
+    var_forecasts = []
+    actual_returns = []
+    
+    # Rolling window backtest
+    for i in range(rolling_window, len(returns)):
+        # Use past data to calculate VaR
+        past_returns = returns.iloc[i-rolling_window:i]
+        
+        # Calculate VaR based on method
+        if var_method == 'parametric':
+            var_forecast = parametric_var(past_returns, horizon, conf, 'normal')
+        elif var_method == 'historical':
+            var_forecast = historical_var(past_returns, horizon, conf)
+        else:  # monte_carlo
+            sims = mc_simulation(past_returns.values, n_sims=5000, n_days=horizon)
+            var_forecast = np.percentile(sims[:, -1] - 1, (1-conf)*100)
+        
+        # Check if next day return violates VaR
+        actual_return = returns.iloc[i]
+        violation = 1 if actual_return < var_forecast else 0
+        
+        violations.append(violation)
+        var_forecasts.append(var_forecast)
+        actual_returns.append(actual_return)
+    
+    violations = np.array(violations)
+    total_obs = len(violations)
+    num_violations = violations.sum()
+    violation_rate = num_violations / total_obs if total_obs > 0 else 0
+    expected_rate = 1 - conf
+    
+    # Kupiec Test (Unconditional Coverage)
+    lr_uc = 0.0
+    kupiec_pvalue = 0.0
+    if num_violations > 0 and num_violations < total_obs:
+        try:
+            lr_uc = -2 * (
+                num_violations * np.log(expected_rate) + 
+                (total_obs - num_violations) * np.log(1 - expected_rate) -
+                num_violations * np.log(violation_rate) -
+                (total_obs - num_violations) * np.log(1 - violation_rate)
+            )
+            kupiec_pvalue = 1 - chi2.cdf(lr_uc, df=1)
+        except:
+            kupiec_pvalue = 0.0
+    
+    # Christoffersen Test (Independence)
+    n00 = ((violations[:-1] == 0) & (violations[1:] == 0)).sum()
+    n01 = ((violations[:-1] == 0) & (violations[1:] == 1)).sum()
+    n10 = ((violations[:-1] == 1) & (violations[1:] == 0)).sum()
+    n11 = ((violations[:-1] == 1) & (violations[1:] == 1)).sum()
+    
+    christ_pvalue = None
+    try:
+        pi01 = n01 / (n00 + n01) if (n00 + n01) > 0 else 0
+        pi11 = n11 / (n10 + n11) if (n10 + n11) > 0 else 0
+        pi = (n01 + n11) / (n00 + n01 + n10 + n11) if (n00 + n01 + n10 + n11) > 0 else 0
+        
+        if pi01 > 0 and pi11 > 0 and (1-pi01) > 0 and (1-pi11) > 0 and pi > 0 and (1-pi) > 0:
+            lr_ind = -2 * (
+                n00 * np.log(1-pi) + n01 * np.log(pi) + 
+                n10 * np.log(1-pi) + n11 * np.log(pi) -
+                n00 * np.log(1-pi01) - n01 * np.log(pi01) -
+                n10 * np.log(1-pi11) - n11 * np.log(pi11)
+            )
+            christ_pvalue = 1 - chi2.cdf(lr_ind, df=1)
+    except:
+        christ_pvalue = None
+    
+    # Model is adequate if both tests pass (p-value > 0.05)
+    kupiec_pass = kupiec_pvalue > 0.05
+    christ_pass = christ_pvalue > 0.05 if christ_pvalue is not None else None
+    model_adequate = kupiec_pass and (christ_pass is None or christ_pass)
+    
+    return {
+        'method': var_method,
+        'confidence': conf,
+        'total_observations': total_obs,
+        'violations': int(num_violations),
+        'violation_rate': float(violation_rate),
+        'expected_rate': float(expected_rate),
+        'kupiec_stat': float(lr_uc),
+        'kupiec_pvalue': float(kupiec_pvalue),
+        'kupiec_pass': kupiec_pass,
+        'christoffersen_pvalue': float(christ_pvalue) if christ_pvalue is not None else None,
+        'christoffersen_pass': christ_pass,
+        'model_adequate': model_adequate,
+        'var_forecasts': var_forecasts,
+        'actual_returns': actual_returns,
+        'violations_series': violations.tolist()
+    }
 
 # ============================================================================
 # ADVANCED MODELS
@@ -526,29 +817,25 @@ def correlation_breakdown(returns_df: pd.DataFrame,
     }
 
 # ============================================================================
-# DATA LAYER INTEGRATION (NEW)
+# ADDITIONAL DATA LAYER HELPERS
 # ============================================================================
-def get_data_aggregator():
-    """Get DataAggregator instance with fallback."""
-    if HAS_DATA_LAYER:
-        return DataAggregator()
-    return None
-
 def fetch_with_fallback(ticker: str, start: str, end: str) -> pd.DataFrame:
-    """Fetch data using new data layer with fallback to direct yfinance."""
+    """Fetch data using data layer with fallback to direct yfinance."""
     aggregator = get_data_aggregator()
     
     if aggregator:
-        return aggregator.fetch_historical(ticker, start, end)
-    else:
-        return fetch_data(ticker, start, end)
+        data, source = aggregator.fetch_historical(ticker, start, end)
+        if not data.empty:
+            return data
+    return fetch_data(ticker, start, end)
 
 def fetch_fundamentals_enhanced(ticker: str) -> dict:
     """Fetch enhanced fundamentals using data layer."""
     aggregator = get_data_aggregator()
     
     if aggregator:
-        return aggregator.fetch_info(ticker)
-    else:
-        return fetch_info(ticker)
-
+        try:
+            return aggregator.fetch_info(ticker)
+        except Exception:
+            pass
+    return fetch_info(ticker)
