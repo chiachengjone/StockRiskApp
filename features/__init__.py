@@ -1,5 +1,5 @@
 # Features Module
-from .alerts import AlertManager
+from .alerts import AlertManager, render_alerts_panel, render_alert_notification_badge
 from .reports import ReportGenerator
 from .options import OptionsAnalytics
 from .fundamentals import FundamentalAnalyzer

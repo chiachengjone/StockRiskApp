@@ -5,7 +5,40 @@ A professional-grade **Stock Risk Modeling & Portfolio Analysis** web applicatio
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.28+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Version](https://img.shields.io/badge/version-4.4-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-4.5-brightgreen.svg)
+
+## What's New in v4.5
+
+### 🎨 Enhanced User Interface
+- **Visual Hierarchy** - Color-coded primary metrics (Sharpe, VaR, Max DD, Volatility) with clear status indicators
+- **Contextual Insights** - AI-generated insights explaining what metrics mean and recommended actions
+- **Compact Mode** - Toggle for smaller screens and mobile-friendly layouts
+- **Progressive Disclosure** - Collapsible sections to reduce information overload
+
+### 🔔 Integrated Alert System  
+- **Risk Alerts Panel** - Full alert management directly within analysis tabs
+- **Threshold Configuration** - Set alerts on VaR, volatility, drawdown, Sharpe, and price levels
+- **Alert History** - Track triggered alerts with timestamps
+- **Quick Default Alerts** - One-click creation of standard risk thresholds
+
+### 📊 Rebalancing Recommendations
+- **Actionable Trade Lists** - See exact BUY/SELL trades with dollar amounts
+- **Transaction Cost Estimates** - Calculate costs before rebalancing
+- **Multiple Target Options** - Equal Weight, Min Volatility, Max Sharpe, Risk Parity, or Custom
+- **Drift Visualization** - Visual bar charts showing position drift from targets
+
+### 📈 Position Sizing (Single Stock)
+- **Kelly Criterion Analysis** - Full, Half, and Quarter Kelly recommendations
+- **Position Size Calculator** - Interactive tool to calculate share counts
+- **Risk-Based Limits** - Maximum position size based on acceptable loss tolerance
+
+### 🧹 Cleaned Up Sidebar
+- **Streamlined Settings** - Compact toggles for Dark Mode and Compact layouts
+- **Alert Badge** - Live notification count in sidebar
+- **Collapsible Sections** - Data source and help moved to expandable panels
+- **Quick Reference** - Integrated metrics reference table
+
+---
 
 ## What's New in v4.4
 
@@ -317,6 +350,15 @@ Enhanced utilities package:
 - Live quote fetching
 - Market hours detection
 - Real-time P&L tracking
+
+#### `utils/ui_components.py` (NEW in v4.5)
+- Enhanced metric cards with color coding
+- Visual hierarchy components (primary/secondary metrics)
+- Insight box rendering with context
+- Rebalancing recommendations display
+- Performance attribution summaries
+- Responsive column layouts
+- Help modal and quick reference
 
 ### `services/` (NEW in v4.2)
 TA Signals extension services:

@@ -50,7 +50,11 @@ from ml_predictor import MLPredictor
 
 # Import new modules (graceful fallback)
 try:
-    from features import AlertManager, ReportGenerator, OptionsAnalytics, FundamentalAnalyzer, StockComparison
+    from features import (
+        AlertManager, ReportGenerator, OptionsAnalytics, 
+        FundamentalAnalyzer, StockComparison,
+        render_alerts_panel, render_alert_notification_badge
+    )
     from storage import PortfolioStore
     HAS_FEATURES = True
 except ImportError:
@@ -155,7 +159,12 @@ try:
         HISTORICAL_SCENARIOS, SECTOR_MAP,
         create_correlation_network, create_var_backtest_chart,
         create_sector_pie_chart, create_risk_score_gauge,
-        create_scenario_impact_chart, create_performance_attribution_waterfall
+        create_scenario_impact_chart, create_performance_attribution_waterfall,
+        # UI Components (v4.5)
+        init_ui_state, render_metric_card, render_primary_metrics,
+        render_secondary_metrics, render_insight_box, generate_risk_insights,
+        render_help_modal, render_quick_actions, render_rebalance_recommendations,
+        render_performance_attribution_summary, classify_metric, MetricLevel
     )
     HAS_ENHANCED_UTILS = True
 except ImportError as e:
@@ -366,88 +375,86 @@ COLORS = {
 # SIDEBAR
 # ============================================================================
 with st.sidebar:
-    st.markdown("### Settings")
+    st.markdown("### ⚙️ Settings")
     
-    with st.expander("Metrics Reference", expanded=False):
-        st.markdown("""
-        **VaR** — Maximum expected loss at confidence level
-        
-        **CVaR/ES** — Average loss beyond VaR threshold
-        
-        **Sharpe** — Risk-adjusted return
-        
-        **Sortino** — Downside risk-adjusted return
-        
-        **Calmar** — Return / Max Drawdown
-        
-        **Beta** — Sensitivity to benchmark
-        
-        **GARCH** — Volatility clustering model
-        
-        **EVT** — Extreme Value Theory for tails
-        """)
-    
-    with st.expander("How to Use", expanded=False):
-        st.markdown("""
-        **Single Stock**
-        1. Select asset and benchmark
-        2. Configure timeframe
-        3. Run analysis
-        
-        **Portfolio**
-        1. Enter tickers (comma-separated)
-        2. Set weights (sum to 100%)
-        3. Run analysis
-        """)
-    
-    st.divider()
-    
+    # Quick settings in main view
     rf_rate = st.number_input("Risk-Free Rate (%)", 0.0, 10.0, 4.5, 0.1) / 100
-    theme_dark = st.toggle("Dark Charts", value=True)
+    
+    # UI Mode toggles
+    col1, col2 = st.columns(2)
+    with col1:
+        theme_dark = st.toggle("Dark Mode", value=True)
+    with col2:
+        compact_mode = st.toggle("Compact", value=False, help="Compact UI for smaller screens")
+    
+    st.session_state['compact_mode'] = compact_mode
+    st.session_state['show_insights'] = st.toggle("Show Insights", value=True, help="Show contextual insights and tips")
+    
     auto_refresh = st.toggle("Auto-Refresh (5min)", value=False)
+    
+    # Alert Notification Badge
+    if HAS_FEATURES:
+        st.divider()
+        alert_mgr = AlertManager()
+        st.markdown("### 🔔 Alerts")
+        render_alert_notification_badge(alert_mgr)
+        summary = alert_mgr.get_summary()
+        st.caption(f"{summary['active_alerts']} active | {summary['triggered_today']} triggered today")
     
     # Market Status
     if HAS_ENHANCED_UTILS:
         st.divider()
         market_status = is_market_open()
         if market_status.get('is_open', False):
-            st.success("Market Open")
+            st.success("🟢 Market Open")
         else:
-            st.info("Market Closed")
+            st.info("⚪ Market Closed")
     
-    # Data Source Display
-    st.divider()
-    st.markdown("### Data Source")
-    
-    # Get active data source info
-    try:
-        from config.settings import get_active_data_source, DATA_SOURCES
-        source_info = get_active_data_source()
+    # Collapsible Data & System Info
+    with st.expander("📊 Data Source", expanded=False):
+        try:
+            from config.settings import get_active_data_source, DATA_SOURCES
+            source_info = get_active_data_source()
+            
+            st.metric("Source", source_info['display_name'])
+            st.caption(f"Type: {source_info['type']}")
+            st.success("Connected")
+            
+            enabled_count = sum(1 for s in DATA_SOURCES.values() if s.get('enabled', False) or s.get('api_key'))
+            if enabled_count > 1:
+                st.caption(f"{enabled_count} sources available")
+        except ImportError:
+            st.metric("Source", "Yahoo Finance")
+            st.caption("Type: Free API")
+            st.success("Connected")
+        except Exception:
+            st.metric("Source", "Yahoo Finance")
+            st.caption("Type: Free API")
+            st.success("Connected")
         
-        st.metric("Source", source_info['display_name'])
-        st.caption(f"Type: {source_info['type']}")
-        st.success("Connected")
-        
-        # Show available sources count
-        enabled_count = sum(1 for s in DATA_SOURCES.values() if s.get('enabled', False) or s.get('api_key'))
-        if enabled_count > 1:
-            st.caption(f"{enabled_count} sources available")
-    except ImportError:
-        st.metric("Source", "Yahoo Finance")
-        st.caption("Type: Free API")
-        st.success("Connected")
-    except Exception:
-        st.metric("Source", "Yahoo Finance")
-        st.caption("Type: Free API")
-        st.success("Connected")
+        # ML Model Status
+        ml_test = MLPredictor()
+        if ml_test.model_type == 'xgboost':
+            st.success("XGBoost Ready")
+        else:
+            st.warning("GradientBoosting Fallback")
     
-    # ML Model Status
-    st.divider()
-    ml_test = MLPredictor()
-    if ml_test.model_type == 'xgboost':
-        st.success("XGBoost Ready")
-    else:
-        st.warning("Using GradientBoosting (XGBoost unavailable)")
+    # Help modal / reference
+    with st.expander("❓ Quick Reference", expanded=False):
+        st.markdown("""
+        | Metric | Good Value |
+        |--------|------------|
+        | **Sharpe** | > 1.0 |
+        | **VaR 95%** | < 3% |
+        | **Volatility** | < 25% |
+        | **Max DD** | > -20% |
+        | **Beta** | 0.8 - 1.2 |
+        
+        **VaR** = Max expected loss at confidence level  
+        **CVaR** = Average loss beyond VaR  
+        **GARCH** = Volatility clustering model  
+        **EVT** = Extreme tail risk
+        """)
     
     # Extended Features - All enabled by default when available
     # Features are automatically enabled if the modules are available
@@ -821,43 +828,71 @@ if mode == "Single Stock":
         h_var = historical_var(rets, var_horizon, conf_level)
         cv = cvar(rets, conf_level)
         
-        # Define tabs - include Sentiment if available (Enhanced features now integrated elsewhere)
+        # Define tabs - Core tabs first, then optional features
         enable_sentiment = st.session_state.get('enable_sentiment', False)
         
         if enable_sentiment and HAS_SENTIMENT_FEATURE:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13 = st.tabs([
                 "Overview", "Forecast", "VaR Analysis", "Monte Carlo", "Stress Test", 
-                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Sentiment", "Export"
+                "Factors", "AI Risk", "Options", "Fundamentals", "Alerts", "Sentiment", "Export", "Rebalance"
             ])
             export_tab = tab12
+            alerts_tab = tab10
+            rebalance_tab = tab13
         else:
-            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
                 "Overview", "Forecast", "VaR Analysis", "Monte Carlo", "Stress Test", 
-                "Advanced", "Factors", "AI Risk", "Options", "Fundamentals", "Export"
+                "Factors", "AI Risk", "Options", "Fundamentals", "Alerts", "Export", "Rebalance"
             ])
-            tab12 = None
+            tab13 = None
             export_tab = tab11
+            alerts_tab = tab10
+            rebalance_tab = tab12
         
         # TAB 1: OVERVIEW
         with tab1:
             st.subheader(f"{ticker} Risk Summary")
             
+            # Alert check for VaR spike
             long_term_var = parametric_var(rets, 1, 0.95)
             recent_var = parametric_var(rets.tail(60), 1, 0.95)
             if abs(recent_var) > abs(long_term_var) * 1.5:
-                st.warning(f"VaR Alert: Recent VaR ({recent_var:.2%}) is 50%+ higher than historical ({long_term_var:.2%})")
+                if HAS_ENHANCED_UTILS:
+                    render_insight_box(
+                        f"VaR Alert: Recent VaR ({recent_var:.2%}) is 50%+ higher than historical ({long_term_var:.2%}). Consider reducing position size.",
+                        "danger"
+                    )
+                else:
+                    st.warning(f"VaR Alert: Recent VaR ({recent_var:.2%}) is 50%+ higher than historical ({long_term_var:.2%})")
             
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Ann. Return", f"{metrics['ann_ret']:.1%}")
-            col2.metric("Ann. Volatility", f"{metrics['ann_vol']:.1%}")
-            col3.metric("Max Drawdown", f"{metrics['max_dd']:.1%}")
-            col4.metric(f"Beta vs {benchmark}", f"{beta:.2f}" if not np.isnan(beta) else "N/A")
-            
-            col5, col6, col7, col8 = st.columns(4)
-            col5.metric("Sharpe Ratio", f"{metrics['sharpe']:.2f}")
-            col6.metric("Sortino Ratio", f"{metrics['sortino']:.2f}")
-            col7.metric("Calmar Ratio", f"{metrics['calmar']:.2f}")
-            col8.metric("Skewness", f"{metrics['skew']:.2f}")
+            # Enhanced metrics with visual hierarchy
+            if HAS_ENHANCED_UTILS:
+                # Primary metrics with color coding
+                render_primary_metrics(metrics, p_var, benchmark)
+                
+                # Secondary metrics in collapsible section
+                render_secondary_metrics(metrics, beta, alpha)
+                
+                # Generate and display insights
+                if st.session_state.get('show_insights', True):
+                    insights = generate_risk_insights(metrics, p_var, beta)
+                    if insights:
+                        st.markdown("#### 💡 Key Insights")
+                        for message, insight_type in insights[:3]:  # Show top 3 insights
+                            render_insight_box(message, insight_type)
+            else:
+                # Fallback to original display
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Ann. Return", f"{metrics['ann_ret']:.1%}")
+                col2.metric("Ann. Volatility", f"{metrics['ann_vol']:.1%}")
+                col3.metric("Max Drawdown", f"{metrics['max_dd']:.1%}")
+                col4.metric(f"Beta vs {benchmark}", f"{beta:.2f}" if not np.isnan(beta) else "N/A")
+                
+                col5, col6, col7, col8 = st.columns(4)
+                col5.metric("Sharpe Ratio", f"{metrics['sharpe']:.2f}")
+                col6.metric("Sortino Ratio", f"{metrics['sortino']:.2f}")
+                col7.metric("Calmar Ratio", f"{metrics['calmar']:.2f}")
+                col8.metric("Skewness", f"{metrics['skew']:.2f}")
             
             if info:
                 st.markdown("---")
@@ -867,8 +902,14 @@ if mode == "Single Stock":
                 col3.metric("P/E Ratio", f"{info.get('trailingPE', 'N/A'):.1f}" if isinstance(info.get('trailingPE'), (int, float)) else "N/A")
                 col4.metric("Div Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "N/A")
             
-            # Price chart
+            # Price chart with context
             st.markdown("---")
+            if HAS_ENHANCED_UTILS and st.session_state.get('show_insights', True):
+                render_insight_box(
+                    f"This chart shows {ticker}'s price history. The shaded area represents the price trend over your selected {days_back}-day period.",
+                    "info"
+                )
+            
             fig1 = go.Figure()
             fig1.add_trace(go.Scatter(x=prices.index, y=prices.values, name='Price', 
                                       line=dict(color=COLORS['primary'], width=1.5),
@@ -878,12 +919,15 @@ if mode == "Single Stock":
                               margin=dict(t=40, b=40, l=40, r=20))
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Rolling Metrics Section (NEW)
+            # Rolling Metrics Section
             st.markdown("---")
             st.markdown("#### Rolling Risk Metrics")
-            col1, col2 = st.columns(2)
             
-            with col1:
+            # Compact mode uses different column layout
+            col_layout = 1 if st.session_state.get('compact_mode', False) else 2
+            cols = st.columns(col_layout)
+            
+            with cols[0]:
                 rolling_vol = rolling_volatility(rets, 21)
                 fig_rvol = go.Figure()
                 fig_rvol.add_trace(go.Scatter(x=rolling_vol.index, y=rolling_vol.values * 100,
@@ -898,7 +942,20 @@ if mode == "Single Stock":
                                        yaxis_title="Volatility (%)")
                 st.plotly_chart(fig_rvol, use_container_width=True)
             
-            with col2:
+            if col_layout > 1:
+                with cols[1]:
+                    rolling_sh = rolling_sharpe(rets, 63, rf_rate)
+                    fig_rsh = go.Figure()
+                    fig_rsh.add_trace(go.Scatter(x=rolling_sh.index, y=rolling_sh.values,
+                                                 name='63-Day Rolling Sharpe',
+                                                 line=dict(color=COLORS['success'], width=1.5)))
+                    fig_rsh.add_hline(y=0, line_dash="dash", line_color=COLORS['gray'])
+                    fig_rsh.update_layout(title="Rolling Sharpe Ratio (Quarterly)", height=250,
+                                          template='plotly_dark' if theme_dark else 'plotly_white',
+                                          yaxis_title="Sharpe Ratio")
+                    st.plotly_chart(fig_rsh, use_container_width=True)
+            else:
+                # In compact mode, show Sharpe below
                 rolling_sh = rolling_sharpe(rets, 63, rf_rate)
                 fig_rsh = go.Figure()
                 fig_rsh.add_trace(go.Scatter(x=rolling_sh.index, y=rolling_sh.values,
@@ -919,12 +976,12 @@ if mode == "Single Stock":
                 with col1:
                     market_status = is_market_open()
                     if market_status.get('is_open', False):
-                        st.success("Market is OPEN")
+                        st.success("🟢 Market is OPEN")
                     else:
-                        st.warning("Market is CLOSED")
+                        st.info("⚪ Market is CLOSED")
                 
                 with col2:
-                    if st.button("Refresh Quote", key="overview_refresh"):
+                    if st.button("🔄 Refresh Quote", key="overview_refresh"):
                         st.rerun()
                 
                 # Live quote
@@ -1885,8 +1942,29 @@ if mode == "Single Stock":
             else:
                 st.info("Fundamental analysis requires company info data")
         
+        # TAB 10: ALERTS
+        with alerts_tab:
+            st.subheader("🔔 Risk Alerts")
+            st.caption("Monitor and manage risk threshold alerts")
+            
+            if HAS_FEATURES:
+                # Prepare current metrics for alert checking
+                current_metrics = {
+                    'var': abs(p_var),
+                    'volatility': metrics['ann_vol'],
+                    'max_drawdown': metrics['max_dd'],
+                    'sharpe': metrics['sharpe'],
+                    'price': float(prices.iloc[-1]) if len(prices) > 0 else 0
+                }
+                
+                # Render the alerts panel
+                alert_manager_local = AlertManager()
+                render_alerts_panel(alert_manager_local, ticker, current_metrics)
+            else:
+                st.info("Alerts feature not available. Install required dependencies.")
+        
         # TAB 11: SENTIMENT ANALYSIS - if enabled
-        if tab12 is not None and st.session_state.get('enable_sentiment', False):
+        if tab13 is not None and st.session_state.get('enable_sentiment', False):
             with tab11:
                 st.subheader("Sentiment Analysis")
                 st.caption("NLP-based sentiment scoring and VaR adjustment")
@@ -1980,6 +2058,83 @@ if mode == "Single Stock":
                     st.info("PDF generation requires fpdf2: `pip install fpdf2`")
             else:
                 st.info("Report generation module not available")
+        
+        # REBALANCE TAB - Position Sizing Recommendations
+        with rebalance_tab:
+            st.subheader("📊 Position Sizing & Recommendations")
+            st.caption("Optimal position sizing based on Kelly Criterion and risk metrics")
+            
+            # Kelly Criterion Position Sizing
+            st.markdown("#### Kelly Criterion Analysis")
+            
+            if HAS_ENHANCED_UTILS and st.session_state.get('show_insights', True):
+                render_insight_box(
+                    "The Kelly Criterion suggests the optimal fraction of capital to allocate to maximize long-term growth while managing risk.",
+                    "info"
+                )
+            
+            try:
+                # Use factor analyzer for Kelly calculation
+                fa_kelly = FactorAnalyzer(rets.to_frame(name=ticker), bench_rets)
+                kelly_results = fa_kelly.kelly_fraction(ticker)
+                
+                if kelly_results and 'full_kelly' in kelly_results:
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Full Kelly", f"{kelly_results['full_kelly']:.1%}")
+                    col2.metric("Half Kelly (Safer)", f"{kelly_results['half_kelly']:.1%}")
+                    col3.metric("Quarter Kelly (Conservative)", f"{kelly_results['quarter_kelly']:.1%}")
+                    
+                    st.markdown("---")
+                    
+                    # Position sizing calculator
+                    st.markdown("#### Position Size Calculator")
+                    portfolio_value = st.number_input("Portfolio Value ($)", min_value=1000, value=100000, step=1000, key="pos_size_value")
+                    kelly_fraction = st.select_slider(
+                        "Kelly Fraction",
+                        options=["Quarter", "Half", "Full"],
+                        value="Half",
+                        key="kelly_fraction_select"
+                    )
+                    
+                    kelly_map = {"Quarter": kelly_results['quarter_kelly'], "Half": kelly_results['half_kelly'], "Full": kelly_results['full_kelly']}
+                    selected_kelly = kelly_map[kelly_fraction]
+                    
+                    position_size = portfolio_value * selected_kelly
+                    current_price = float(prices.iloc[-1]) if len(prices) > 0 else 100
+                    shares = int(position_size / current_price) if current_price > 0 else 0
+                    
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Recommended Position", f"${position_size:,.0f}")
+                    col2.metric("Shares to Buy", f"{shares:,}")
+                    col3.metric("Current Price", f"${current_price:.2f}")
+                    
+                    if HAS_ENHANCED_UTILS:
+                        if selected_kelly > 0.25:
+                            render_insight_box(
+                                f"A {selected_kelly:.0%} allocation is aggressive. Consider diversifying across multiple assets to reduce concentration risk.",
+                                "warning"
+                            )
+                        else:
+                            render_insight_box(
+                                f"A {selected_kelly:.0%} allocation is conservative and leaves room for adding to the position on dips.",
+                                "success"
+                            )
+                else:
+                    st.info("Insufficient data to calculate Kelly Criterion")
+            except Exception as e:
+                st.warning(f"Could not calculate position sizing: {e}")
+            
+            # Risk-based Position Limits
+            st.markdown("---")
+            st.markdown("#### Risk-Based Position Limits")
+            
+            max_loss_pct = st.slider("Maximum Acceptable Loss (%)", 1, 10, 2, key="max_loss_slider")
+            position_limit = (max_loss_pct / 100) / abs(p_var) if abs(p_var) > 0 else 1.0
+            position_limit = min(position_limit, 1.0)  # Cap at 100%
+            
+            col1, col2 = st.columns(2)
+            col1.metric("Max Position Size", f"{position_limit:.0%}", help=f"Based on {max_loss_pct}% max loss and {abs(p_var):.2%} daily VaR")
+            col2.metric("Dollar Amount", f"${portfolio_value * position_limit:,.0f}" if 'portfolio_value' in dir() else "N/A")
 
 # ============================================================================
 # PORTFOLIO MODE
@@ -2575,71 +2730,116 @@ else:
         if HAS_ENHANCED_UTILS:
             with tabs[tab_idx]:
                 tab_idx += 1
-                st.subheader("Rebalancing Analysis")
+                st.subheader("📊 Rebalancing Analysis")
+                
+                # Insights
+                if st.session_state.get('show_insights', True):
+                    render_insight_box(
+                        "Rebalancing helps maintain your target allocation and manage risk. Frequent rebalancing increases costs, while infrequent rebalancing lets drift accumulate.",
+                        "info"
+                    )
                 
                 # Transaction Costs Section
                 st.markdown("### Transaction Cost Analysis")
-                st.info("Estimate costs of rebalancing to target weights.")
                 
                 portfolio_value = st.number_input("Portfolio Value ($)", 10000, 10000000, 100000, 10000, key="rebal_port_val")
                 
-                if st.button("Analyze Rebalance Costs", type="primary", key="analyze_costs"):
-                    with st.spinner("Calculating costs..."):
-                        # Use current weights vs equal weight as example
-                        current_w = {t: weights[t]/100 for t in tickers}
-                        target_w = {t: 1/len(tickers) for t in tickers}
-                        
-                        # Placeholder prices
-                        prices_dict = {t: 100 for t in tickers}
-                        
-                        cost_result = calculate_rebalance_costs(
-                            current_w, target_w, portfolio_value, prices_dict
+                # Target weight selection
+                st.markdown("#### Target Weights")
+                target_type = st.selectbox(
+                    "Optimization Target",
+                    ["Equal Weight", "Min Volatility", "Max Sharpe", "Risk Parity", "Custom"],
+                    key="target_type_select"
+                )
+                
+                if target_type == "Equal Weight":
+                    target_weights = {t: 1/len(tickers) for t in tickers}
+                elif target_type == "Custom":
+                    st.markdown("Set custom target weights:")
+                    target_weights = {}
+                    cols = st.columns(len(tickers))
+                    for i, t in enumerate(tickers):
+                        with cols[i]:
+                            target_weights[t] = st.number_input(f"{t} %", 0, 100, int(100/len(tickers)), key=f"target_{t}") / 100
+                else:
+                    # Calculate optimal weights
+                    target_weights = {t: 1/len(tickers) for t in tickers}  # Placeholder
+                    if target_type == "Min Volatility":
+                        result = optimize_portfolio(returns_df, objective='min_vol')
+                        if result and result.get('weights'):
+                            target_weights = {t: result['weights'][i] for i, t in enumerate(tickers)}
+                    elif target_type == "Max Sharpe":
+                        result = optimize_portfolio(returns_df, objective='max_sharpe')
+                        if result and result.get('weights'):
+                            target_weights = {t: result['weights'][i] for i, t in enumerate(tickers)}
+                    elif target_type == "Risk Parity":
+                        rp_weights = risk_parity_weights(returns_df)
+                        if rp_weights is not None and len(rp_weights) == len(tickers):
+                            target_weights = {t: rp_weights[i] for i, t in enumerate(tickers)}
+                
+                # Current weights
+                current_weights = {t: weights[t]/100 for t in tickers}
+                
+                # Use the new render_rebalance_recommendations function
+                if st.button("Generate Rebalancing Trades", type="primary", key="gen_trades"):
+                    with st.spinner("Calculating rebalancing trades..."):
+                        trade_df = render_rebalance_recommendations(
+                            current_weights=current_weights,
+                            target_weights=target_weights,
+                            portfolio_value=portfolio_value,
+                            transaction_cost_pct=0.001
                         )
                         
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric("Total Cost", f"${cost_result['total_cost']:.2f}")
-                        col2.metric("Cost (bps)", f"{cost_result['total_cost_bps']:.1f}")
-                        col3.metric("Turnover", f"{cost_result['turnover_pct']:.1f}%")
-                        
-                        # Trade list
-                        if cost_result['trades']:
-                            st.markdown("#### Proposed Trades")
-                            trades_df = pd.DataFrame(cost_result['trades'])
-                            st.dataframe(trades_df, use_container_width=True, hide_index=True)
+                        if not trade_df.empty:
+                            # Cost analysis
+                            cost_result = calculate_rebalance_costs(
+                                current_weights, target_weights, portfolio_value, 
+                                {t: 100 for t in tickers}  # Placeholder prices
+                            )
+                            
+                            if st.session_state.get('show_insights', True):
+                                turnover = cost_result.get('turnover_pct', 0)
+                                if turnover > 50:
+                                    render_insight_box(
+                                        f"High turnover ({turnover:.0f}%) means significant rebalancing. Consider partial rebalancing to reduce costs.",
+                                        "warning"
+                                    )
+                                else:
+                                    render_insight_box(
+                                        f"Moderate turnover ({turnover:.0f}%) is reasonable for portfolio rebalancing.",
+                                        "success"
+                                    )
                 
                 st.markdown("---")
                 
                 # Rebalancing Threshold Section
                 st.markdown("### Rebalancing Threshold Check")
-                st.info("Check if portfolio drift exceeds rebalancing thresholds.")
                 
                 threshold = st.slider("Rebalancing Threshold", 0.01, 0.20, 0.05, 0.01, key="rebal_threshold")
                 
-                # Simulate some drift
-                current_w = {t: weights[t]/100 for t in tickers}
-                target_w = {t: weights[t]/100 for t in tickers}  # Same for demo
-                
-                # Add some random drift for demo
-                import random
-                drifted_w = {t: w * (1 + random.uniform(-0.1, 0.1)) for t, w in current_w.items()}
-                total_d = sum(drifted_w.values())
-                drifted_w = {t: v/total_d for t, v in drifted_w.items()}
-                
-                rebal_result = threshold_rebalancing(drifted_w, target_w, threshold)
+                # Calculate actual drift from target
+                rebal_result = threshold_rebalancing(current_weights, target_weights, threshold)
                 
                 if rebal_result['needs_rebalance']:
-                    st.warning(f"Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
+                    st.warning(f"⚠️ Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
                 else:
-                    st.success(f"No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
+                    st.success(f"✅ No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
                 
-                # Show drifts
-                drift_df = pd.DataFrame({
-                    'Asset': list(rebal_result['drifts'].keys()),
-                    'Drift': [v*100 for v in rebal_result['drifts'].values()],
-                    'Threshold': [threshold*100]*len(rebal_result['drifts'])
-                })
-                st.dataframe(drift_df.style.format({'Drift': '{:.2f}%', 'Threshold': '{:.1f}%'}),
-                           use_container_width=True, hide_index=True)
+                # Show drifts with visual bar
+                st.markdown("#### Position Drift")
+                for ticker, drift in rebal_result['drifts'].items():
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        st.markdown(f"**{ticker}**")
+                    with col2:
+                        drift_pct = abs(drift) * 100
+                        bar_color = "#34C759" if drift_pct < threshold * 100 else "#FF9500" if drift_pct < threshold * 200 else "#FF3B30"
+                        st.markdown(f"""
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: {min(drift_pct * 5, 100)}%; height: 8px; background: {bar_color}; border-radius: 4px;"></div>
+                            <span style="margin-left: 8px; font-family: monospace;">{drift:+.2%}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
             
             # TAB: RISK ANALYTICS - Historical Scenarios, VaR Backtest, Attribution, Network
             with tabs[tab_idx]:

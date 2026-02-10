@@ -72,6 +72,17 @@ from .analytics_enhanced import (
     calculate_performance_attribution, run_var_backtest
 )
 
+# New in v4.5 - UI Components
+from .ui_components import (
+    MetricLevel, MetricThresholds, UI_COLORS,
+    init_ui_state, classify_metric, get_metric_color,
+    render_metric_card, render_primary_metrics, render_secondary_metrics,
+    render_insight_box, generate_risk_insights, render_chart_with_context,
+    render_compact_tabs, render_alert_badge, toggle_section,
+    render_responsive_columns, render_help_modal, render_quick_actions,
+    render_rebalance_recommendations, render_performance_attribution_summary
+)
+
 __all__ = [
     # Performance
     'cached_fetch_data', 'cached_fetch_info', 'cached_fetch_multiple',
@@ -129,5 +140,14 @@ __all__ = [
     'calculate_unified_risk_score', 'replay_historical_scenario',
     'replay_all_scenarios', 'analyze_sector_exposure',
     'calculate_performance_attribution', 'run_var_backtest',
+    
+    # UI Components (v4.5)
+    'MetricLevel', 'MetricThresholds', 'UI_COLORS',
+    'init_ui_state', 'classify_metric', 'get_metric_color',
+    'render_metric_card', 'render_primary_metrics', 'render_secondary_metrics',
+    'render_insight_box', 'generate_risk_insights', 'render_chart_with_context',
+    'render_compact_tabs', 'render_alert_badge', 'toggle_section',
+    'render_responsive_columns', 'render_help_modal', 'render_quick_actions',
+    'render_rebalance_recommendations', 'render_performance_attribution_summary',
 ]
 

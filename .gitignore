@@ -48,5 +48,10 @@ Thumbs.db
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Cache
+cache/
+*.pkl
+*.pkl.meta
+
 # Environment variables
 .env
