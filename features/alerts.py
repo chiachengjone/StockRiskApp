@@ -269,7 +269,7 @@ class AlertManager:
             msg = MIMEMultipart()
             msg['From'] = self.config['email']
             msg['To'] = self.config['email']
-            msg['Subject'] = f"🚨 Risk Alert: {len(triggered_alerts)} Alert(s) Triggered"
+            msg['Subject'] = f" Risk Alert: {len(triggered_alerts)} Alert(s) Triggered"
             
             body = self._format_alert_email(triggered_alerts)
             msg.attach(MIMEText(body, 'html'))
@@ -305,7 +305,7 @@ class AlertManager:
             </style>
         </head>
         <body>
-            <h2>🚨 Risk Alerts Triggered</h2>
+            <h2> Risk Alerts Triggered</h2>
             <p>The following risk thresholds have been breached:</p>
         """
         
@@ -394,7 +394,7 @@ def render_alerts_panel(
         'muted': '#8b949e'
     }
     
-    st.markdown("### 🔔 Risk Alerts")
+    st.markdown("###  Risk Alerts")
     
     # Get summary
     summary = alert_manager.get_summary()
@@ -412,7 +412,7 @@ def render_alerts_panel(
         
         if triggered:
             st.markdown("---")
-            st.markdown("#### ⚠️ Triggered Alerts")
+            st.markdown("####  Triggered Alerts")
             
             for alert in triggered:
                 st.markdown(f"""
@@ -443,7 +443,7 @@ def render_alerts_panel(
                 col1, col2, col3 = st.columns([3, 1, 1])
                 
                 with col1:
-                    status_icon = "🟢" if alert['active'] else "⚪"
+                    status_icon = "🟢" if alert['active'] else ""
                     st.markdown(f"{status_icon} **{alert['name']}**")
                     st.caption(f"{alert['metric'].upper()} {alert['direction']} {alert['threshold']:.2%}")
                 

@@ -619,13 +619,13 @@ def render_what_if_tab(
         with col1:
             st.plotly_chart(
                 create_metrics_comparison_chart(current_scenario, proposed_scenario),
-                use_container_width=True
+                width="stretch"
             )
         
         with col2:
             st.plotly_chart(
                 create_weight_comparison_chart(current_weights, normalized_weights),
-                use_container_width=True
+                width="stretch"
             )
     
     with tab2:
@@ -649,7 +649,7 @@ def render_what_if_tab(
         
         st.plotly_chart(
             create_frontier_with_scenarios(frontier_rets, frontier_vols, scenarios),
-            use_container_width=True
+            width="stretch"
         )
     
     with tab3:
@@ -666,7 +666,7 @@ def render_what_if_tab(
             
             st.plotly_chart(
                 create_trade_table_chart(trades),
-                use_container_width=True
+                width="stretch"
             )
             
             # Detailed trade list
@@ -680,7 +680,7 @@ def render_what_if_tab(
                 
                 st.dataframe(df[['asset', 'action', 'current_weight', 'new_weight', 
                                'change', 'trade_value', 'transaction_cost']], 
-                           use_container_width=True, hide_index=True)
+                           width="stretch", hide_index=True)
         else:
             st.info("No trades needed - proposed weights match current allocation.")
 

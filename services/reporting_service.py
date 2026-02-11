@@ -557,15 +557,15 @@ class ReportingService:
         
         # Win rate recommendations
         if overall.win_rate < 40:
-            recs.append("⚠️ Win rate is below 40%. Consider tightening entry criteria.")
+            recs.append(" Win rate is below 40%. Consider tightening entry criteria.")
         elif overall.win_rate > 60:
-            recs.append("✅ Strong win rate. Consider sizing up on high-confidence signals.")
+            recs.append(" Strong win rate. Consider sizing up on high-confidence signals.")
         
         # Profit factor
         if overall.profit_factor < 1.0:
-            recs.append("⚠️ Profit factor below 1.0 indicates losses exceed wins. Review stop loss strategy.")
+            recs.append(" Profit factor below 1.0 indicates losses exceed wins. Review stop loss strategy.")
         elif overall.profit_factor > 2.0:
-            recs.append("✅ Excellent profit factor. Strategy is working well.")
+            recs.append(" Excellent profit factor. Strategy is working well.")
         
         # Best sources
         if by_source:
@@ -573,27 +573,27 @@ class ReportingService:
             worst_source = min(by_source.items(), key=lambda x: x[1].win_rate)
             
             if best_source[1].win_rate > 60:
-                recs.append(f"💡 {best_source[0]} signals have {best_source[1].win_rate:.1f}% win rate. Consider increasing allocation.")
+                recs.append(f" {best_source[0]} signals have {best_source[1].win_rate:.1f}% win rate. Consider increasing allocation.")
             
             if worst_source[1].win_rate < 40:
-                recs.append(f"💡 {worst_source[0]} signals have low {worst_source[1].win_rate:.1f}% win rate. Review or reduce usage.")
+                recs.append(f" {worst_source[0]} signals have low {worst_source[1].win_rate:.1f}% win rate. Review or reduce usage.")
         
         # Best symbols
         if by_symbol:
             sorted_symbols = sorted(by_symbol.items(), key=lambda x: x[1].total_return_pct, reverse=True)
             if len(sorted_symbols) >= 3:
                 top_3 = [s[0] for s in sorted_symbols[:3]]
-                recs.append(f"💡 Top performing symbols: {', '.join(top_3)}")
+                recs.append(f" Top performing symbols: {', '.join(top_3)}")
         
         # Risk management
         if overall.max_consecutive_losses >= 5:
-            recs.append("⚠️ Had 5+ consecutive losses. Consider implementing cooldown rules.")
+            recs.append(" Had 5+ consecutive losses. Consider implementing cooldown rules.")
         
         if overall.avg_loss_pct > overall.avg_win_pct:
-            recs.append("⚠️ Average loss exceeds average win. Tighten stop losses or widen targets.")
+            recs.append(" Average loss exceeds average win. Tighten stop losses or widen targets.")
         
         if not recs:
-            recs.append("📊 Performance within normal parameters. Continue monitoring.")
+            recs.append(" Performance within normal parameters. Continue monitoring.")
         
         return recs
     

@@ -258,7 +258,7 @@ def render_secondary_metrics(metrics: Dict, beta: float = None, alpha: float = N
         beta: Portfolio beta
         alpha: Portfolio alpha
     """
-    with st.expander("📊 Additional Metrics", expanded=False):
+    with st.expander(" Additional Metrics", expanded=False):
         col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
@@ -312,11 +312,11 @@ def render_insight_box(
         icon: Optional custom icon
     """
     icons = {
-        "info": "💡",
-        "warning": "⚠️",
-        "success": "✅",
-        "danger": "🚨",
-        "tip": "💎"
+        "info": "",
+        "warning": "",
+        "success": "",
+        "danger": "",
+        "tip": ""
     }
     
     colors = {
@@ -327,7 +327,7 @@ def render_insight_box(
         "tip": (UI_COLORS['secondary'], f"{UI_COLORS['secondary']}15")
     }
     
-    icon_char = icon or icons.get(insight_type, "💡")
+    icon_char = icon or icons.get(insight_type, "")
     border_color, bg_color = colors.get(insight_type, colors["info"])
     
     html = f"""
@@ -422,7 +422,7 @@ def render_chart_with_context(
         render_insight_box(interpretation, "info")
     
     fig = chart_func(**(chart_args or {}))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_compact_tabs(tab_names: List[str], group_advanced: bool = True) -> Tuple:
@@ -532,7 +532,7 @@ def render_responsive_columns(items: List[Dict], max_cols: int = 4) -> None:
 
 def render_help_modal():
     """Render a help modal with documentation."""
-    with st.expander("❓ Quick Reference", expanded=False):
+    with st.expander(" Quick Reference", expanded=False):
         st.markdown("""
         ### Key Metrics Explained
         
@@ -565,19 +565,19 @@ def render_quick_actions(ticker: str = None, tickers: List[str] = None):
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        if st.button("📊 Full Report", use_container_width=True, help="Download comprehensive PDF report"):
+        if st.button(" Full Report", width="stretch", help="Download comprehensive PDF report"):
             st.session_state['generate_report'] = True
     
     with col2:
-        if st.button("🔔 Set Alerts", use_container_width=True, help="Configure risk alerts"):
+        if st.button(" Set Alerts", width="stretch", help="Configure risk alerts"):
             st.session_state['show_alerts'] = True
     
     with col3:
-        if st.button("📈 Compare", use_container_width=True, help="Compare with benchmarks"):
+        if st.button(" Compare", width="stretch", help="Compare with benchmarks"):
             st.session_state['show_comparison'] = True
     
     with col4:
-        if st.button("⚙️ Settings", use_container_width=True, help="Adjust analysis parameters"):
+        if st.button(" Settings", width="stretch", help="Adjust analysis parameters"):
             st.session_state['show_settings'] = True
 
 
@@ -625,7 +625,7 @@ def render_rebalance_recommendations(
     if trades:
         df = pd.DataFrame(trades)
         
-        st.markdown("#### 📋 Rebalancing Trade List")
+        st.markdown("####  Rebalancing Trade List")
         
         # Summary
         total_trades = len(trades)
@@ -643,7 +643,7 @@ def render_rebalance_recommendations(
                 lambda x: ['background-color: #1a3d1a' if v == 'BUY' else 'background-color: #3d1a1a' if v == 'SELL' else '' for v in x],
                 subset=['Action']
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
         

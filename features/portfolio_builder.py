@@ -985,7 +985,7 @@ def render_risk_budget_tab(
         )
     
     # Optimize
-    if st.button("Optimize Risk Budget", type="primary", use_container_width=True):
+    if st.button("Optimize Risk Budget", type="primary", width="stretch"):
         with st.spinner("Optimizing..."):
             optimizer = RiskBudgetOptimizer(returns)
             result = optimizer.optimize(
@@ -1009,7 +1009,7 @@ def render_risk_budget_tab(
         
         # Charts
         fig = create_risk_budget_chart(result)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         
         # Weights table
         st.markdown("#### Optimized Weights")
@@ -1019,7 +1019,7 @@ def render_risk_budget_tab(
             'Risk Contribution': [f"{v:.4f}" for v in result.risk_contributions.values()],
             '% of Total Risk': [f"{v:.1%}" for v in result.pct_risk_contributions.values()]
         })
-        st.dataframe(weights_df, use_container_width=True, hide_index=True)
+        st.dataframe(weights_df, width="stretch", hide_index=True)
 
 
 def render_factor_builder_tab(
@@ -1038,7 +1038,7 @@ def render_factor_builder_tab(
             factor_scores.style.format("{:.2f}").background_gradient(
                 cmap='RdYlGn', axis=0, vmin=-2, vmax=2
             ),
-            use_container_width=True
+            width="stretch"
         )
     
     st.markdown("#### Target Factor Exposures")
@@ -1068,7 +1068,7 @@ def render_factor_builder_tab(
         min_weight = st.slider("Min Weight", 0.0, 0.1, 0.02, 0.01, key="fb_min_weight")
     
     # Build portfolio
-    if st.button("Build Factor Portfolio", type="primary", use_container_width=True):
+    if st.button("Build Factor Portfolio", type="primary", width="stretch"):
         with st.spinner("Building portfolio..."):
             builder = FactorPortfolioBuilder(returns, factor_scores)
             result = builder.build(
@@ -1090,7 +1090,7 @@ def render_factor_builder_tab(
             target_exposures,
             "Factor Exposure: Actual vs Target"
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         
         # Weights and exposures
         col1, col2 = st.columns(2)
@@ -1101,7 +1101,7 @@ def render_factor_builder_tab(
                 'Asset': list(result.weights.keys()),
                 'Weight': [f"{v:.1%}" for v in result.weights.values()]
             })
-            st.dataframe(weights_df, use_container_width=True, hide_index=True)
+            st.dataframe(weights_df, width="stretch", hide_index=True)
         
         with col2:
             st.markdown("#### Factor Exposure Comparison")
@@ -1111,7 +1111,7 @@ def render_factor_builder_tab(
                 'Achieved': [f"{v:.2f}" for v in result.factor_exposures.values()],
                 'Return Contrib': [f"{result.factor_contribution.get(f, 0):.2%}" for f in result.factor_exposures.keys()]
             })
-            st.dataframe(exp_df, use_container_width=True, hide_index=True)
+            st.dataframe(exp_df, width="stretch", hide_index=True)
 
 
 def render_presets_tab(
@@ -1138,7 +1138,7 @@ def render_presets_tab(
                     if st.button(
                         f"{preset.icon} {preset.name}",
                         key=f"preset_{preset_key}",
-                        use_container_width=True
+                        width="stretch"
                     ):
                         st.session_state['selected_preset'] = preset_key
     
@@ -1180,14 +1180,14 @@ def render_presets_tab(
             yaxis_title="Weight (%)",
             height=350
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     
     # Comparison chart of all presets
     st.markdown("---")
     st.markdown("#### All Presets Comparison")
     
     fig = create_preset_comparison_chart(returns, current_weights)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 # =============================================================================

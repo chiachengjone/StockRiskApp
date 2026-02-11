@@ -532,18 +532,18 @@ def render_sentiment_tab(
                 result.overall_score,
                 result.overall_label.value
             )
-            st.plotly_chart(gauge_fig, use_container_width=True)
+            st.plotly_chart(gauge_fig, width="stretch")
         
         with col2:
             # News breakdown pie
             breakdown_fig = create_news_sentiment_breakdown(result)
-            st.plotly_chart(breakdown_fig, use_container_width=True)
+            st.plotly_chart(breakdown_fig, width="stretch")
         
         # Trend chart
         try:
             trend_df = service.get_trending_sentiment(ticker, lookback_days=30)
             trend_fig = create_sentiment_trend_chart(trend_df, ticker)
-            st.plotly_chart(trend_fig, use_container_width=True)
+            st.plotly_chart(trend_fig, width="stretch")
         except Exception as e:
             st.info("Sentiment trend data not available")
     
@@ -611,7 +611,7 @@ def render_sentiment_tab(
         
         # Activity chart
         whale_fig = create_whale_activity_chart(result.whale_activities)
-        st.plotly_chart(whale_fig, use_container_width=True)
+        st.plotly_chart(whale_fig, width="stretch")
         
         # Activity table
         if result.whale_activities:
@@ -622,7 +622,7 @@ def render_sentiment_tab(
                 'Shares': f"{a.shares:,}" if a.shares else "N/A"
             } for a in result.whale_activities]
             
-            st.dataframe(pd.DataFrame(activity_data), use_container_width=True)
+            st.dataframe(pd.DataFrame(activity_data), width="stretch")
     
     with tab4:
         st.subheader("Sentiment-Adjusted VaR")
@@ -660,10 +660,10 @@ def render_sentiment_tab(
             
             # Comparison chart
             var_fig = create_var_comparison_chart(var_result)
-            st.plotly_chart(var_fig, use_container_width=True)
+            st.plotly_chart(var_fig, width="stretch")
             
             # Explanation
-            with st.expander("📖 What is Sentiment VaR?"):
+            with st.expander(" What is Sentiment VaR?"):
                 st.markdown("""
                 **Sentiment VaR** adjusts traditional Value at Risk based on current market sentiment:
                 
@@ -724,7 +724,7 @@ def render_portfolio_sentiment(
     
     # Heatmap
     heatmap_fig = create_portfolio_sentiment_heatmap(portfolio_result)
-    st.plotly_chart(heatmap_fig, use_container_width=True)
+    st.plotly_chart(heatmap_fig, width="stretch")
     
     # Per-asset breakdown
     st.subheader("Per-Asset Sentiment")

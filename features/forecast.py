@@ -975,11 +975,11 @@ def render_single_stock_forecast_tab(
     
     with col1:
         fig_price = create_stock_price_chart(forecast, current_price, ticker)
-        st.plotly_chart(fig_price, use_container_width=True)
+        st.plotly_chart(fig_price, width="stretch")
     
     with col2:
         fig_dist = create_stock_distribution_chart(forecast, current_price, ticker)
-        st.plotly_chart(fig_dist, use_container_width=True)
+        st.plotly_chart(fig_dist, width="stretch")
     
     # Scenario Projections
     st.markdown("#### PRICE SCENARIOS")
@@ -989,7 +989,7 @@ def render_single_stock_forecast_tab(
     
     with col1:
         fig_scenario = create_stock_scenario_chart(scenarios, current_price, ticker)
-        st.plotly_chart(fig_scenario, use_container_width=True)
+        st.plotly_chart(fig_scenario, width="stretch")
     
     with col2:
         st.markdown("**Scenario Summary**")
@@ -1019,7 +1019,7 @@ def render_single_stock_forecast_tab(
             'Low (5%)': '${:,.2f}',
             'High (95%)': '${:,.2f}'
         }),
-        use_container_width=True,
+        width="stretch",
         hide_index=True
     )
     
@@ -1175,11 +1175,11 @@ def render_forecast_tab(
     
     with col1:
         fig_fan = create_fan_chart(forecast, portfolio_value)
-        st.plotly_chart(fig_fan, use_container_width=True)
+        st.plotly_chart(fig_fan, width="stretch")
     
     with col2:
         fig_dist = create_probability_chart(forecast)
-        st.plotly_chart(fig_dist, use_container_width=True)
+        st.plotly_chart(fig_dist, width="stretch")
     
     # Scenario Projections
     st.markdown("#### SCENARIO ANALYSIS")
@@ -1189,7 +1189,7 @@ def render_forecast_tab(
     
     with col1:
         fig_scenario = create_scenario_chart(scenarios, portfolio_value)
-        st.plotly_chart(fig_scenario, use_container_width=True)
+        st.plotly_chart(fig_scenario, width="stretch")
     
     with col2:
         st.markdown("**Scenario Summary**")
@@ -1220,7 +1220,7 @@ def render_forecast_tab(
             'Low (5%)': '${:,.0f}',
             'High (95%)': '${:,.0f}'
         }),
-        use_container_width=True,
+        width="stretch",
         hide_index=True
     )
     
@@ -1293,7 +1293,7 @@ def render_forecast_tab(
     
     if stock_forecasts:
         stock_df = pd.DataFrame(stock_forecasts)
-        st.dataframe(stock_df, use_container_width=True, hide_index=True)
+        st.dataframe(stock_df, width="stretch", hide_index=True)
         
         # Mini chart showing relative expected changes
         fig_stocks = go.Figure()
@@ -1325,7 +1325,7 @@ def render_forecast_tab(
             yaxis=dict(gridcolor='#222222', tickformat='+.1f%', zeroline=True, zerolinecolor='#666666')
         )
         
-        st.plotly_chart(fig_stocks, use_container_width=True)
+        st.plotly_chart(fig_stocks, width="stretch")
     
     # Model Info
     with st.expander("Model Details"):

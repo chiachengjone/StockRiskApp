@@ -392,7 +392,7 @@ class AlpacaProvider(BaseDataProvider):
         """
         endpoint = "/v1beta1/news"
         
-        params = {'limit': limit}
+        params = {'limit': min(limit, 50)}  # Alpaca caps news at 50
         
         if symbols:
             params['symbols'] = ','.join([s.upper() for s in symbols])

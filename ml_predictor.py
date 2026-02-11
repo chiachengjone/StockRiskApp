@@ -582,17 +582,27 @@ class MLPredictor:
         
         predictions = np.array(predictions)
         
+        point_estimate = float(np.median(predictions))
+        lower_bound = float(np.percentile(predictions, 2.5))
+        upper_bound = float(np.percentile(predictions, 97.5))
+        std_error = float(np.std(predictions))
+        
         return {
+            'predicted_var': point_estimate,
+            'lower_bound': lower_bound,
+            'upper_bound': upper_bound,
+            'confidence_level': 0.95,
+            'std_error': std_error,
             'mean_var': float(np.mean(predictions)),
-            'median_var': float(np.median(predictions)),
-            'std_var': float(np.std(predictions)),
+            'median_var': point_estimate,
+            'std_var': std_error,
             'ci_5': float(np.percentile(predictions, 5)),
             'ci_95': float(np.percentile(predictions, 95)),
-            'ci_lower': float(np.percentile(predictions, 2.5)),
-            'ci_upper': float(np.percentile(predictions, 97.5)),
+            'ci_lower': lower_bound,
+            'ci_upper': upper_bound,
             'n_bootstrap': len(predictions),
-            'confidence_width': float(np.percentile(predictions, 97.5) - 
-                                     np.percentile(predictions, 2.5))
+            'confidence_width': upper_bound - lower_bound,
+            'model_type': 'ensemble_bootstrap'
         }
     
     def get_feature_importance_chart_data(self, returns: pd.Series, 

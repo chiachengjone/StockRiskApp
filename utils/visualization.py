@@ -360,7 +360,7 @@ def animated_price_chart(
                 xanchor="center",
                 buttons=[
                     dict(
-                        label="▶ Play",
+                        label=" Play",
                         method="animate",
                         args=[None, {
                             "frame": {"duration": frame_duration},
@@ -849,7 +849,7 @@ def get_download_link(html_content: str, filename: str = "chart.html") -> str:
         HTML anchor tag for download
     """
     b64 = base64.b64encode(html_content.encode()).decode()
-    return f'<a href="data:text/html;base64,{b64}" download="{filename}">📥 Download Chart</a>'
+    return f'<a href="data:text/html;base64,{b64}" download="{filename}"> Download Chart</a>'
 
 
 # =============================================================================

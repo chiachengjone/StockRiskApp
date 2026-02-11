@@ -569,7 +569,7 @@ def render_digital_twin_tab(
     st.markdown("*Compare your portfolio under different management scenarios*")
     
     # Configuration
-    with st.expander("⚙️ Simulation Configuration", expanded=False):
+    with st.expander(" Simulation Configuration", expanded=False):
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -617,7 +617,7 @@ def render_digital_twin_tab(
     with col1:
         st.plotly_chart(
             create_health_gauge(health.overall_score),
-            use_container_width=True
+            width="stretch"
         )
         
         # Component scores
@@ -646,13 +646,13 @@ def render_digital_twin_tab(
     with tab1:
         st.plotly_chart(
             create_scenario_comparison_chart(scenarios),
-            use_container_width=True
+            width="stretch"
         )
     
     with tab2:
         st.plotly_chart(
             create_fan_chart(scenarios, horizon_days, initial_capital),
-            use_container_width=True
+            width="stretch"
         )
     
     with tab3:
@@ -673,7 +673,7 @@ def render_digital_twin_tab(
             })
         
         df = pd.DataFrame(scenario_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
         
         # Best scenario
         best_sharpe = max(scenarios.values(), key=lambda x: x.sharpe_ratio)
@@ -688,7 +688,7 @@ def render_digital_twin_tab(
     st.divider()
     
     # Correlation Monitoring
-    st.markdown("### 🔗 Correlation Monitoring")
+    st.markdown("###  Correlation Monitoring")
     
     if engine.correlation_monitor:
         convergence = engine.correlation_monitor.detect_convergence()
@@ -731,14 +731,14 @@ def render_digital_twin_tab(
             
             col1, col2 = st.columns(2)
             with col1:
-                st.plotly_chart(fig_baseline, use_container_width=True)
+                st.plotly_chart(fig_baseline, width="stretch")
             with col2:
-                st.plotly_chart(fig_recent, use_container_width=True)
+                st.plotly_chart(fig_recent, width="stretch")
         
         # Rolling correlation chart
         st.plotly_chart(
             create_correlation_change_chart(engine.correlation_monitor),
-            use_container_width=True
+            width="stretch"
         )
 
 

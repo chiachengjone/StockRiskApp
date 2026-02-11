@@ -764,7 +764,7 @@ def render_single_stock_analysis(
         )
     
     with col3:
-        analyze_btn = st.button("Analyze", type="primary", use_container_width=True, key="analyze_btn")
+        analyze_btn = st.button("Analyze", type="primary", width="stretch", key="analyze_btn")
     
     if analyze_btn or ticker:
         with st.spinner("Fetching data..."):
@@ -791,7 +791,7 @@ def render_single_stock_analysis(
         with col1:
             # Signal Gauge
             fig_gauge = create_signal_gauge(score, signal_type)
-            st.plotly_chart(fig_gauge, use_container_width=True, config=CHART_CONFIG)
+            st.plotly_chart(fig_gauge, width="stretch", config=CHART_CONFIG)
         
         with col2:
             st.markdown("### Current Signal Analysis")
@@ -839,7 +839,7 @@ def render_single_stock_analysis(
         st.markdown("### Price Chart with Indicators")
         
         fig = create_candlestick_chart(df, indicators, signals, title=f"{ticker} Technical Analysis")
-        st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+        st.plotly_chart(fig, width="stretch", config=CHART_CONFIG)
         
         # Indicator Summary
         st.markdown("---")
@@ -887,7 +887,7 @@ def render_single_stock_analysis(
             
             if signals_data:
                 signals_df = pd.DataFrame(signals_data)
-                st.dataframe(signals_df, use_container_width=True, hide_index=True)
+                st.dataframe(signals_df, width="stretch", hide_index=True)
 
 
 def render_screener_mode(ta_service: TAService, signals_service: SignalsService) -> None:
@@ -1033,7 +1033,7 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
         st.info(f"Ready to scan {min(len(selected_tickers), int(max_stocks))} stocks")
     
     # Scan button
-    scan_btn = st.button("Scan Stocks", type="primary", key="scan_btn", use_container_width=True)
+    scan_btn = st.button("Scan Stocks", type="primary", key="scan_btn", width="stretch")
     
     if scan_btn:
         if not selected_tickers:
@@ -1135,7 +1135,7 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
             
             st.dataframe(
                 results_df,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 column_config={
                     'Score': st.column_config.ProgressColumn(
@@ -1153,7 +1153,7 @@ def render_screener_mode(ta_service: TAService, signals_service: SignalsService)
             # Export option
             csv = results_df.to_csv(index=False)
             st.download_button(
-                label="📥 Download Results (CSV)",
+                label=" Download Results (CSV)",
                 data=csv,
                 file_name="screener_results.csv",
                 mime="text/csv"
@@ -1252,7 +1252,7 @@ def render_backtest_module(ta_service: TAService, signals_service: SignalsServic
         st.markdown("### Equity Curve")
         
         fig = create_equity_curve_chart(result.equity_curve, f"{ticker} Backtest Equity Curve")
-        st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+        st.plotly_chart(fig, width="stretch", config=CHART_CONFIG)
         
         # Trades table
         if result.trades:
@@ -1273,7 +1273,7 @@ def render_backtest_module(ta_service: TAService, signals_service: SignalsServic
                 })
             
             trades_df = pd.DataFrame(trades_data)
-            st.dataframe(trades_df, use_container_width=True, hide_index=True)
+            st.dataframe(trades_df, width="stretch", hide_index=True)
 
 
 def render_portfolio_signals(ta_service: TAService, signals_service: SignalsService) -> None:
@@ -1340,7 +1340,7 @@ def render_portfolio_signals(ta_service: TAService, signals_service: SignalsServ
             agg_signal = result['aggregate_signal']
             
             fig = create_signal_gauge(agg_score, agg_signal)
-            st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+            st.plotly_chart(fig, width="stretch", config=CHART_CONFIG)
         
         with col2:
             st.markdown("### Portfolio Signal Summary")
@@ -1378,7 +1378,7 @@ def render_portfolio_signals(ta_service: TAService, signals_service: SignalsServ
         
         st.dataframe(
             holdings_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             column_config={
                 'Score': st.column_config.ProgressColumn(
@@ -1421,7 +1421,7 @@ def render_portfolio_signals(ta_service: TAService, signals_service: SignalsServ
                 margin=dict(t=20, b=60, l=20, r=20)
             )
             
-            st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+            st.plotly_chart(fig, width="stretch", config=CHART_CONFIG)
         
         with col2:
             st.markdown("### Score by Holding")
@@ -1455,7 +1455,7 @@ def render_portfolio_signals(ta_service: TAService, signals_service: SignalsServ
                 margin=dict(t=20, b=40, l=60, r=20)
             )
             
-            st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+            st.plotly_chart(fig, width="stretch", config=CHART_CONFIG)
 
 
 def render_signal_dashboard(ta_service: TAService, signals_service: SignalsService) -> None:
@@ -1623,7 +1623,7 @@ def render_signal_dashboard(ta_service: TAService, signals_service: SignalsServi
     
     st.dataframe(
         summary_df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             'Score': st.column_config.ProgressColumn(
@@ -1701,7 +1701,7 @@ def render_pattern_analysis(pattern_service: PatternService) -> None:
                     'Confidence': f"{p.confidence:.0f}%"
                 })
             
-            st.dataframe(pd.DataFrame(pattern_data), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(pattern_data), width="stretch", hide_index=True)
         else:
             st.info("No candlestick patterns detected in recent data")
         

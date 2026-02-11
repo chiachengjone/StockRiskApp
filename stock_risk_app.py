@@ -375,7 +375,7 @@ COLORS = {
 # SIDEBAR
 # ============================================================================
 with st.sidebar:
-    st.markdown("### ⚙️ Settings")
+    st.markdown("###  Settings")
     
     # Quick settings in main view
     rf_rate = st.number_input("Risk-Free Rate (%)", 0.0, 10.0, 4.5, 0.1) / 100
@@ -396,7 +396,7 @@ with st.sidebar:
     if HAS_FEATURES:
         st.divider()
         alert_mgr = AlertManager()
-        st.markdown("### 🔔 Alerts")
+        st.markdown("###  Alerts")
         render_alert_notification_badge(alert_mgr)
         summary = alert_mgr.get_summary()
         st.caption(f"{summary['active_alerts']} active | {summary['triggered_today']} triggered today")
@@ -408,10 +408,10 @@ with st.sidebar:
         if market_status.get('is_open', False):
             st.success("🟢 Market Open")
         else:
-            st.info("⚪ Market Closed")
+            st.info(" Market Closed")
     
     # Collapsible Data & System Info
-    with st.expander("📊 Data Source", expanded=False):
+    with st.expander(" Data Source", expanded=False):
         try:
             from config.settings import get_active_data_source, DATA_SOURCES
             source_info = get_active_data_source()
@@ -440,7 +440,7 @@ with st.sidebar:
             st.warning("GradientBoosting Fallback")
     
     # Help modal / reference
-    with st.expander("❓ Quick Reference", expanded=False):
+    with st.expander(" Quick Reference", expanded=False):
         st.markdown("""
         | Metric | Good Value |
         |--------|------------|
@@ -722,7 +722,7 @@ if mode == "Single Stock":
     if 'single_analyzed' not in st.session_state:
         st.session_state.single_analyzed = False
     
-    if st.button("Analyze Risk", type="primary", use_container_width=True):
+    if st.button("Analyze Risk", type="primary", width="stretch"):
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
         
@@ -877,7 +877,7 @@ if mode == "Single Stock":
                 if st.session_state.get('show_insights', True):
                     insights = generate_risk_insights(metrics, p_var, beta)
                     if insights:
-                        st.markdown("#### 💡 Key Insights")
+                        st.markdown("####  Key Insights")
                         for message, insight_type in insights[:3]:  # Show top 3 insights
                             render_insight_box(message, insight_type)
             else:
@@ -917,7 +917,7 @@ if mode == "Single Stock":
             fig1.update_layout(title=f"{ticker} Price History", height=300, 
                               template='plotly_dark' if theme_dark else 'plotly_white',
                               margin=dict(t=40, b=40, l=40, r=20))
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig1, width="stretch")
             
             # Rolling Metrics Section
             st.markdown("---")
@@ -940,7 +940,7 @@ if mode == "Single Stock":
                 fig_rvol.update_layout(title="Rolling Volatility (Annualized)", height=250,
                                        template='plotly_dark' if theme_dark else 'plotly_white',
                                        yaxis_title="Volatility (%)")
-                st.plotly_chart(fig_rvol, use_container_width=True)
+                st.plotly_chart(fig_rvol, width="stretch")
             
             if col_layout > 1:
                 with cols[1]:
@@ -953,7 +953,7 @@ if mode == "Single Stock":
                     fig_rsh.update_layout(title="Rolling Sharpe Ratio (Quarterly)", height=250,
                                           template='plotly_dark' if theme_dark else 'plotly_white',
                                           yaxis_title="Sharpe Ratio")
-                    st.plotly_chart(fig_rsh, use_container_width=True)
+                    st.plotly_chart(fig_rsh, width="stretch")
             else:
                 # In compact mode, show Sharpe below
                 rolling_sh = rolling_sharpe(rets, 63, rf_rate)
@@ -965,7 +965,7 @@ if mode == "Single Stock":
                 fig_rsh.update_layout(title="Rolling Sharpe Ratio (Quarterly)", height=250,
                                       template='plotly_dark' if theme_dark else 'plotly_white',
                                       yaxis_title="Sharpe Ratio")
-                st.plotly_chart(fig_rsh, use_container_width=True)
+                st.plotly_chart(fig_rsh, width="stretch")
             
             # Real-time Market Data Section
             if HAS_ENHANCED_UTILS:
@@ -978,10 +978,10 @@ if mode == "Single Stock":
                     if market_status.get('is_open', False):
                         st.success("🟢 Market is OPEN")
                     else:
-                        st.info("⚪ Market is CLOSED")
+                        st.info(" Market is CLOSED")
                 
                 with col2:
-                    if st.button("🔄 Refresh Quote", key="overview_refresh"):
+                    if st.button(" Refresh Quote", key="overview_refresh"):
                         st.rerun()
                 
                 # Live quote
@@ -1040,7 +1040,7 @@ if mode == "Single Stock":
                                 color_discrete_sequence=[COLORS['primary']])
                 fig_var.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', 
                                      showlegend=False, height=350)
-                st.plotly_chart(fig_var, use_container_width=True)
+                st.plotly_chart(fig_var, width="stretch")
             
             with col2:
                 fig2 = px.histogram(x=rets.values, nbins=60, title="Return Distribution with VaR Threshold",
@@ -1052,7 +1052,7 @@ if mode == "Single Stock":
                               line_color=COLORS['warning'], line_width=2,
                               annotation_text="1% VaR")
                 fig2.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=350)
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, width="stretch")
             
             # VaR Backtesting Section
             if HAS_ENHANCED_UTILS:
@@ -1160,7 +1160,7 @@ if mode == "Single Stock":
                                 template='plotly_dark' if theme_dark else 'plotly_white',
                                 height=400
                             )
-                            st.plotly_chart(fig_bt, use_container_width=True)
+                            st.plotly_chart(fig_bt, width="stretch")
                             
                         except Exception as e:
                             st.error(f"Backtest failed: {str(e)}")
@@ -1202,20 +1202,20 @@ if mode == "Single Stock":
             
             # Monte Carlo Distribution
             fig_mc_dist = create_mc_distribution_chart(mc_rets, mc_var, mc_cvar, theme_dark)
-            st.plotly_chart(fig_mc_dist, use_container_width=True)
+            st.plotly_chart(fig_mc_dist, width="stretch")
             
             col1, col2 = st.columns(2)
             
             with col1:
                 # Simulation Paths
                 fig_paths, p5_end, p95_end, median_end = create_mc_paths_chart(rets, n_paths=100, horizon=mc_horizon, theme_dark=theme_dark)
-                st.plotly_chart(fig_paths, use_container_width=True)
+                st.plotly_chart(fig_paths, width="stretch")
                 st.caption(f"End values: 5th pctl = {p5_end:.1f}, Median = {median_end:.1f}, 95th pctl = {p95_end:.1f}")
             
             with col2:
                 # Confidence Cone
                 fig_cone, cone_p5, cone_p50, cone_p95 = create_mc_cone_chart(rets, horizon=mc_horizon, theme_dark=theme_dark)
-                st.plotly_chart(fig_cone, use_container_width=True)
+                st.plotly_chart(fig_cone, width="stretch")
                 st.caption(f"At horizon: 5% worst = {cone_p5:.1f}, Median = {cone_p50:.1f}, 95% best = {cone_p95:.1f}")
         
         # TAB 5: STRESS TEST
@@ -1266,7 +1266,7 @@ if mode == "Single Stock":
             ))
             fig_stress.update_layout(title=f"Return Comparison: {scenario}", yaxis_title="Return (%)",
                                     template='plotly_dark' if theme_dark else 'plotly_white', height=350)
-            st.plotly_chart(fig_stress, use_container_width=True)
+            st.plotly_chart(fig_stress, width="stretch")
         
         # TAB 6: ADVANCED
         with tab6:
@@ -1298,7 +1298,7 @@ if mode == "Single Stock":
                     template='plotly_dark' if theme_dark else 'plotly_white',
                     height=300
                 )
-                st.plotly_chart(fig_garch, use_container_width=True)
+                st.plotly_chart(fig_garch, width="stretch")
             
             st.markdown("---")
             st.markdown("### EVT Tail Risk (Extreme Value Theory)")
@@ -1328,7 +1328,7 @@ if mode == "Single Stock":
                                        name=benchmark, line=dict(color=COLORS['gray'], width=2, dash='dash')))
             fig_bt.update_layout(title="Cumulative Returns Comparison", 
                                 template='plotly_dark' if theme_dark else 'plotly_white', height=350)
-            st.plotly_chart(fig_bt, use_container_width=True)
+            st.plotly_chart(fig_bt, width="stretch")
             
             # Regime Detection Section
             if HAS_ENHANCED_UTILS:
@@ -1360,12 +1360,12 @@ if mode == "Single Stock":
                             # Regime statistics
                             st.markdown("#### Regime Statistics")
                             stats_df = pd.DataFrame(regime_result['regime_characteristics']).T
-                            st.dataframe(stats_df, use_container_width=True)
+                            st.dataframe(stats_df, width="stretch")
                             
                             # Regime chart
                             regime_series = regime_result['regime_series']
                             fig_regime = regime_chart(prices, regime_series, title=f"{ticker} Price with Regime Overlay")
-                            st.plotly_chart(fig_regime, use_container_width=True)
+                            st.plotly_chart(fig_regime, width="stretch")
                         else:
                             st.error(regime_result['error'])
             
@@ -1383,22 +1383,22 @@ if mode == "Single Stock":
                 if viz_type == "VaR Cone Projection":
                     horizon = st.slider("Projection Horizon (days)", 10, 90, 30, key="var_cone_horizon")
                     fig_cone = var_cone_chart(rets, horizon=horizon, title=f"{ticker} VaR Cone Projection")
-                    st.plotly_chart(fig_cone, use_container_width=True)
+                    st.plotly_chart(fig_cone, width="stretch")
                     
                 elif viz_type == "Rolling Performance":
                     metric = st.selectbox("Metric", ["sharpe", "volatility", "return", "sortino"], key="rolling_metric")
                     fig_roll = rolling_performance_chart(rets, metric=metric, title=f"{ticker} Rolling {metric.title()}")
-                    st.plotly_chart(fig_roll, use_container_width=True)
+                    st.plotly_chart(fig_roll, width="stretch")
                     
                 elif viz_type == "Cumulative Returns Comparison":
                     # Compare with benchmark
                     combined = pd.DataFrame({ticker: rets, benchmark: bench_rets})
                     fig_cum = cumulative_returns_chart(combined, title="Cumulative Returns Comparison")
-                    st.plotly_chart(fig_cum, use_container_width=True)
+                    st.plotly_chart(fig_cum, width="stretch")
                 
                 # Download chart option
                 st.markdown("---")
-                if st.button("📥 Download Chart as HTML", key="download_adv_chart"):
+                if st.button(" Download Chart as HTML", key="download_adv_chart"):
                     if viz_type == "VaR Cone Projection":
                         html = make_chart_downloadable(fig_cone)
                     elif viz_type == "Rolling Performance":
@@ -1434,7 +1434,7 @@ if mode == "Single Stock":
                     
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.dataframe(loadings_df.style.format("{:.4f}"), use_container_width=True)
+                        st.dataframe(loadings_df.style.format("{:.4f}"), width="stretch")
                     with col2:
                         fig_loadings = px.bar(x=list(ff_results['loadings'].keys()), 
                                              y=list(ff_results['loadings'].values()),
@@ -1442,7 +1442,7 @@ if mode == "Single Stock":
                                              color_discrete_sequence=[COLORS['primary']])
                         fig_loadings.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', 
                                                   showlegend=False, height=300)
-                        st.plotly_chart(fig_loadings, use_container_width=True)
+                        st.plotly_chart(fig_loadings, width="stretch")
             else:
                 st.info(ff_results.get('error', 'Factor analysis unavailable'))
             
@@ -1484,7 +1484,7 @@ if mode == "Single Stock":
                                 color_discrete_sequence=[COLORS['success'], COLORS['primary'], COLORS['secondary']])
                 fig_esg.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', 
                                      showlegend=False, height=300)
-                st.plotly_chart(fig_esg, use_container_width=True)
+                st.plotly_chart(fig_esg, width="stretch")
         
         # TAB 8: AI RISK
         with tab8:
@@ -1526,7 +1526,7 @@ if mode == "Single Stock":
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.dataframe(comparison_df.style.format({'95% VaR': '{:.2%}'}), use_container_width=True)
+                    st.dataframe(comparison_df.style.format({'95% VaR': '{:.2%}'}), width="stretch")
                 
                 with col2:
                     fig_compare = px.bar(comparison_df, x='Method', y='95% VaR', 
@@ -1534,7 +1534,7 @@ if mode == "Single Stock":
                                         color_discrete_sequence=[COLORS['primary']])
                     fig_compare.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', 
                                              showlegend=False, height=300)
-                    st.plotly_chart(fig_compare, use_container_width=True)
+                    st.plotly_chart(fig_compare, width="stretch")
                 
                 st.markdown("---")
                 
@@ -1548,7 +1548,7 @@ if mode == "Single Stock":
                                     orientation='h', title=f"Top {top_n} Predictive Features",
                                     color_discrete_sequence=[COLORS['primary']])
                     fig_imp.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=350)
-                    st.plotly_chart(fig_imp, use_container_width=True)
+                    st.plotly_chart(fig_imp, width="stretch")
                 
                 st.markdown("---")
                 
@@ -1586,7 +1586,7 @@ if mode == "Single Stock":
                                     ensemble['individual_predictions'],
                                     title="VaR by Model"
                                 )
-                                st.plotly_chart(fig_ens, use_container_width=True)
+                                st.plotly_chart(fig_ens, width="stretch")
                                 
                                 # Confidence intervals
                                 st.markdown("#### Bootstrap Confidence Intervals")
@@ -1619,7 +1619,7 @@ if mode == "Single Stock":
                                             template='plotly_dark' if theme_dark else 'plotly_white',
                                             height=300
                                         )
-                                        st.plotly_chart(fig_ci, use_container_width=True)
+                                        st.plotly_chart(fig_ci, width="stretch")
                                         
                                         # Distribution details
                                         with st.expander("Prediction Distribution Details"):
@@ -1725,7 +1725,7 @@ if mode == "Single Stock":
                     template='plotly_dark' if theme_dark else 'plotly_white',
                     height=350
                 )
-                st.plotly_chart(fig_payoff, use_container_width=True)
+                st.plotly_chart(fig_payoff, width="stretch")
                 
                 # Strategy Analysis - Show all 3 strategies
                 st.markdown("---")
@@ -1789,7 +1789,7 @@ if mode == "Single Stock":
                                         template='plotly_dark' if theme_dark else 'plotly_white',
                                         xaxis_title="Stock Price ($)", yaxis_title="P/L ($)",
                                         showlegend=False, margin=dict(t=40, b=40, l=40, r=20))
-                    st.plotly_chart(fig_cc, use_container_width=True)
+                    st.plotly_chart(fig_cc, width="stretch")
                 
                 with col2:
                     # Protective Put payoff
@@ -1813,7 +1813,7 @@ if mode == "Single Stock":
                                         template='plotly_dark' if theme_dark else 'plotly_white',
                                         xaxis_title="Stock Price ($)", yaxis_title="P/L ($)",
                                         showlegend=False, margin=dict(t=40, b=40, l=40, r=20))
-                    st.plotly_chart(fig_pp, use_container_width=True)
+                    st.plotly_chart(fig_pp, width="stretch")
                 
                 with col3:
                     # Straddle payoff
@@ -1835,7 +1835,7 @@ if mode == "Single Stock":
                                            template='plotly_dark' if theme_dark else 'plotly_white',
                                            xaxis_title="Stock Price ($)", yaxis_title="P/L ($)",
                                            showlegend=False, margin=dict(t=40, b=40, l=40, r=20))
-                    st.plotly_chart(fig_strad, use_container_width=True)
+                    st.plotly_chart(fig_strad, width="stretch")
             else:
                 st.info("Options analytics module not available. Check installation.")
         
@@ -1944,7 +1944,7 @@ if mode == "Single Stock":
         
         # TAB 10: ALERTS
         with alerts_tab:
-            st.subheader("🔔 Risk Alerts")
+            st.subheader(" Risk Alerts")
             st.caption("Monitor and manage risk threshold alerts")
             
             if HAS_FEATURES:
@@ -2061,7 +2061,7 @@ if mode == "Single Stock":
         
         # REBALANCE TAB - Position Sizing Recommendations
         with rebalance_tab:
-            st.subheader("📊 Position Sizing & Recommendations")
+            st.subheader(" Position Sizing & Recommendations")
             st.caption("Optimal position sizing based on Kelly Criterion and risk metrics")
             
             # Kelly Criterion Position Sizing
@@ -2075,10 +2075,20 @@ if mode == "Single Stock":
             
             try:
                 # Use factor analyzer for Kelly calculation
-                fa_kelly = FactorAnalyzer(rets.to_frame(name=ticker), bench_rets)
-                kelly_results = fa_kelly.kelly_fraction(ticker)
+                fa_kelly = FactorAnalyzer()
+                kelly_raw = fa_kelly.kelly_criterion(rets)
                 
-                if kelly_results and 'full_kelly' in kelly_results:
+                # Build full/half/quarter Kelly from raw result
+                kelly_results = {
+                    'full_kelly': kelly_raw.get('kelly_full', 0.0),
+                    'half_kelly': kelly_raw.get('kelly_pct', 0.0),
+                    'quarter_kelly': kelly_raw.get('kelly_full', 0.0) * 0.25,
+                    'win_rate': kelly_raw.get('win_rate', 0.0),
+                    'win_loss_ratio': kelly_raw.get('win_loss_ratio', 0.0),
+                    'edge_per_trade': kelly_raw.get('edge_per_trade', 0.0)
+                }
+                
+                if kelly_results and kelly_results.get('full_kelly', 0) >= 0:
                     col1, col2, col3 = st.columns(3)
                     col1.metric("Full Kelly", f"{kelly_results['full_kelly']:.1%}")
                     col2.metric("Half Kelly (Safer)", f"{kelly_results['half_kelly']:.1%}")
@@ -2146,7 +2156,7 @@ else:
     if HAS_FEATURES:
         portfolio_store = PortfolioStore()
         
-        with st.expander("📁 Saved Portfolios", expanded=False):
+        with st.expander(" Saved Portfolios", expanded=False):
             saved_portfolios = portfolio_store.list_portfolios()
             
             if saved_portfolios:
@@ -2158,7 +2168,7 @@ else:
                         key="load_portfolio_select"
                     )
                 with col2:
-                    if st.button("📥 Load"):
+                    if st.button(" Load"):
                         loaded = portfolio_store.load_portfolio(selected_portfolio)
                         if loaded:
                             st.session_state['loaded_tickers'] = ",".join(loaded['tickers'])
@@ -2200,7 +2210,7 @@ else:
             with col1:
                 portfolio_name = st.text_input("Portfolio Name", "My Portfolio", key="save_port_name")
             with col2:
-                if st.button("💾 Save Portfolio"):
+                if st.button(" Save Portfolio"):
                     portfolio_store.save_portfolio(portfolio_name, tickers, weights)
                     st.success(f"Saved: {portfolio_name}")
     
@@ -2214,7 +2224,7 @@ else:
     if 'port_analyzed' not in st.session_state:
         st.session_state.port_analyzed = False
     
-    if st.button("Analyze Portfolio", type="primary", use_container_width=True) and tickers:
+    if st.button("Analyze Portfolio", type="primary", width="stretch") and tickers:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
         
@@ -2332,7 +2342,7 @@ else:
                         risk_score.color,
                         "Risk Score"
                     )
-                    st.plotly_chart(fig_score, use_container_width=True)
+                    st.plotly_chart(fig_score, width="stretch")
                 
                 with col_metrics:
                     col1, col2, col3, col4 = st.columns(4)
@@ -2381,7 +2391,7 @@ else:
                         sector_exp.sector_risk_contribution,
                         "Sector Weight vs Risk"
                     )
-                    st.plotly_chart(fig_sector, use_container_width=True)
+                    st.plotly_chart(fig_sector, width="stretch")
                 
                 with col2:
                     st.markdown("#### Diversification Metrics")
@@ -2410,7 +2420,7 @@ else:
                         'Beta': f"{betas.get(ticker, 'N/A'):.2f}" if isinstance(betas.get(ticker), float) else "N/A"
                     })
             
-            st.dataframe(pd.DataFrame(individual_metrics), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(individual_metrics), width="stretch", hide_index=True)
             
             st.markdown("#### Risk Contribution by Asset")
             risk_contrib = marginal_var_contribution(returns_df, weights_array, conf_level)
@@ -2419,7 +2429,7 @@ else:
                                 title="Risk Contribution (%)", 
                                 color_discrete_sequence=px.colors.sequential.Blues_r)
             fig_contrib.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=350)
-            st.plotly_chart(fig_contrib, use_container_width=True)
+            st.plotly_chart(fig_contrib, width="stretch")
             
             # Risk Decomposition Section
             if HAS_ENHANCED_UTILS:
@@ -2442,7 +2452,7 @@ else:
                     decomp['pct_contributions'],
                     title="Risk Contribution (%)"
                 )
-                st.plotly_chart(fig_decomp, use_container_width=True)
+                st.plotly_chart(fig_decomp, width="stretch")
                 
                 # Detailed breakdown
                 st.markdown("##### Detailed Breakdown")
@@ -2456,7 +2466,7 @@ else:
                     'Risk Contribution': '{:.4f}',
                     '% of Total': '{:.1f}%',
                     'Marginal Contribution': '{:.4f}'
-                }), use_container_width=True, hide_index=True)
+                }), width="stretch", hide_index=True)
         
         # TAB: FORECAST - Future Growth Projections
         with tabs[tab_idx]:
@@ -2499,16 +2509,16 @@ else:
             st.markdown("---")
             
             fig_mc_dist = create_mc_distribution_chart(mc_rets, mc_var, mc_cvar, theme_dark)
-            st.plotly_chart(fig_mc_dist, use_container_width=True)
+            st.plotly_chart(fig_mc_dist, width="stretch")
             
             col1, col2 = st.columns(2)
             with col1:
                 fig_paths, _, _, _ = create_mc_paths_chart(port_rets, n_paths=100, horizon=mc_horizon, theme_dark=theme_dark)
-                st.plotly_chart(fig_paths, use_container_width=True)
+                st.plotly_chart(fig_paths, width="stretch")
             
             with col2:
                 fig_cone, _, _, _ = create_mc_cone_chart(port_rets, horizon=mc_horizon, theme_dark=theme_dark)
-                st.plotly_chart(fig_cone, use_container_width=True)
+                st.plotly_chart(fig_cone, width="stretch")
         
         # TAB 3: CORRELATION
         with tabs[tab_idx]:
@@ -2519,7 +2529,7 @@ else:
                                 title="Asset Correlation Heatmap",
                                 color_continuous_scale='RdBu_r', zmin=-1, zmax=1)
             fig_corr.update_layout(height=450, template='plotly_dark' if theme_dark else 'plotly_white')
-            st.plotly_chart(fig_corr, use_container_width=True)
+            st.plotly_chart(fig_corr, width="stretch")
         
         # TAB 4: STRESS TESTING
         with tabs[tab_idx]:
@@ -2550,7 +2560,7 @@ else:
             st.markdown("---")
             
             stress_df = pd.DataFrame([{'Asset': k, 'Stressed Return': f"{v:.2%}"} for k, v in stress_results['individual'].items()])
-            st.dataframe(stress_df, use_container_width=True, hide_index=True)
+            st.dataframe(stress_df, width="stretch", hide_index=True)
         
         # TAB 5: OPTIMIZATION
         with tabs[tab_idx]:
@@ -2571,7 +2581,7 @@ else:
                 'Current Weight': [f"{w:.1%}" for w in weights_array],
                 'Optimal Weight': [f"{w:.1%}" for w in opt_result['weights']]
             })
-            st.dataframe(opt_weights_df, use_container_width=True, hide_index=True)
+            st.dataframe(opt_weights_df, width="stretch", hide_index=True)
             
             # Apply buttons for quick weight changes
             apply_col1, apply_col2 = st.columns(2)
@@ -2596,7 +2606,7 @@ else:
             fig_weights.add_trace(go.Bar(name='Optimal', x=tickers, y=opt_result['weights']*100, marker_color=COLORS['primary']))
             fig_weights.update_layout(barmode='group', title='Current vs Optimal Weights', yaxis_title='Weight (%)',
                                      template='plotly_dark' if theme_dark else 'plotly_white', height=350)
-            st.plotly_chart(fig_weights, use_container_width=True)
+            st.plotly_chart(fig_weights, width="stretch")
             
             # Efficient Frontier
             if len(ef) > 0:
@@ -2605,7 +2615,7 @@ else:
                                    color='sharpe', color_continuous_scale='Blues')
                 fig_ef.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=350,
                                     xaxis_title='Volatility', yaxis_title='Expected Return')
-                st.plotly_chart(fig_ef, use_container_width=True)
+                st.plotly_chart(fig_ef, width="stretch")
             
             # Risk Parity and Black-Litterman sections (moved from Enhanced tab)
             if HAS_ENHANCED_UTILS:
@@ -2646,14 +2656,14 @@ else:
                             'Current Weight': '{:.1f}%',
                             'Risk Parity Weight': '{:.1f}%',
                             'Risk Contribution': '{:.1f}%'
-                        }), use_container_width=True, hide_index=True)
+                        }), width="stretch", hide_index=True)
                         
                         # Risk contribution chart
                         fig_rp = risk_contribution_chart(
                             rp_result['risk_contributions'],
                             title="Risk Contribution by Asset"
                         )
-                        st.plotly_chart(fig_rp, use_container_width=True)
+                        st.plotly_chart(fig_rp, width="stretch")
                         
                         # Store result for apply button
                         st.session_state['rp_result'] = rp_result
@@ -2709,7 +2719,7 @@ else:
                                 'Equilibrium': '{:.1f}%',
                                 'Posterior': '{:.1f}%',
                                 'Weight': '{:.1f}%'
-                            }), use_container_width=True, hide_index=True)
+                            }), width="stretch", hide_index=True)
                             
                             # Store result for apply button
                             st.session_state['bl_result'] = bl_result
@@ -2730,7 +2740,7 @@ else:
         if HAS_ENHANCED_UTILS:
             with tabs[tab_idx]:
                 tab_idx += 1
-                st.subheader("📊 Rebalancing Analysis")
+                st.subheader(" Rebalancing Analysis")
                 
                 # Insights
                 if st.session_state.get('show_insights', True):
@@ -2765,17 +2775,19 @@ else:
                     # Calculate optimal weights
                     target_weights = {t: 1/len(tickers) for t in tickers}  # Placeholder
                     if target_type == "Min Volatility":
-                        result = optimize_portfolio(returns_df, objective='min_vol')
-                        if result and result.get('weights'):
-                            target_weights = {t: result['weights'][i] for i, t in enumerate(tickers)}
+                        result = optimize_portfolio(returns_df)
+                        if result and result.get('weights') is not None:
+                            w = result['weights']
+                            target_weights = {t: float(w[i]) for i, t in enumerate(tickers)}
                     elif target_type == "Max Sharpe":
-                        result = optimize_portfolio(returns_df, objective='max_sharpe')
-                        if result and result.get('weights'):
-                            target_weights = {t: result['weights'][i] for i, t in enumerate(tickers)}
+                        result = optimize_portfolio(returns_df)
+                        if result and result.get('weights') is not None:
+                            w = result['weights']
+                            target_weights = {t: float(w[i]) for i, t in enumerate(tickers)}
                     elif target_type == "Risk Parity":
-                        rp_weights = risk_parity_weights(returns_df)
-                        if rp_weights is not None and len(rp_weights) == len(tickers):
-                            target_weights = {t: rp_weights[i] for i, t in enumerate(tickers)}
+                        rp_result = risk_parity_weights(returns_df)
+                        if rp_result is not None and 'weights' in rp_result:
+                            target_weights = {t: rp_result['weights'].get(t, 1/len(tickers)) for t in tickers}
                 
                 # Current weights
                 current_weights = {t: weights[t]/100 for t in tickers}
@@ -2821,9 +2833,9 @@ else:
                 rebal_result = threshold_rebalancing(current_weights, target_weights, threshold)
                 
                 if rebal_result['needs_rebalance']:
-                    st.warning(f"⚠️ Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
+                    st.warning(f" Rebalancing RECOMMENDED - Max drift: {rebal_result['max_drift']:.1%}")
                 else:
-                    st.success(f"✅ No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
+                    st.success(f" No rebalancing needed - Max drift: {rebal_result['max_drift']:.1%}")
                 
                 # Show drifts with visual bar
                 st.markdown("#### Position Drift")
@@ -2863,7 +2875,7 @@ else:
                     if scenarios:
                         # Impact chart
                         fig_scenarios = create_scenario_impact_chart(scenarios)
-                        st.plotly_chart(fig_scenarios, use_container_width=True)
+                        st.plotly_chart(fig_scenarios, width="stretch")
                         
                         # Details table
                         st.markdown("#### Scenario Details")
@@ -2876,7 +2888,7 @@ else:
                             'Recovery (days)': s.recovery_days,
                             'Severity': s.severity
                         } for s in scenarios])
-                        st.dataframe(scenario_df, use_container_width=True, hide_index=True)
+                        st.dataframe(scenario_df, width="stretch", hide_index=True)
                         
                         # Worst case summary
                         worst = min(scenarios, key=lambda x: x.portfolio_return)
@@ -2914,7 +2926,7 @@ else:
                                 'Status': 'Adequate' if r.model_adequate else 'Inadequate',
                                 'Assessment': r.assessment
                             } for r in backtest_results])
-                            st.dataframe(bt_df, use_container_width=True, hide_index=True)
+                            st.dataframe(bt_df, width="stretch", hide_index=True)
                             
                             # Backtest chart for best model
                             best_model = min(backtest_results, key=lambda x: abs(x.violation_rate - x.expected_rate))
@@ -2924,7 +2936,7 @@ else:
                                 best_model.var_series,
                                 f"{best_model.model_name} VaR Backtest"
                             )
-                            st.plotly_chart(fig_bt, use_container_width=True)
+                            st.plotly_chart(fig_bt, width="stretch")
                 
                 # Performance Attribution
                 with analytics_tabs[2]:
@@ -2956,7 +2968,7 @@ else:
                             'factor_contributions': attribution.factor_contributions,
                             'residual': attribution.residual
                         })
-                        st.plotly_chart(fig_attr, use_container_width=True)
+                        st.plotly_chart(fig_attr, width="stretch")
                         
                         # Brinson attribution
                         st.markdown("#### Brinson Attribution")
@@ -2968,7 +2980,7 @@ else:
                                 f"{attribution.interaction_effect:.2%}"
                             ]
                         })
-                        st.dataframe(brinson_df, use_container_width=True, hide_index=True)
+                        st.dataframe(brinson_df, width="stretch", hide_index=True)
                 
                 # Correlation Network
                 with analytics_tabs[3]:
@@ -2984,7 +2996,7 @@ else:
                         threshold=corr_threshold,
                         show_negative=show_neg
                     )
-                    st.plotly_chart(fig_network, use_container_width=True)
+                    st.plotly_chart(fig_network, width="stretch")
                     
                     # Correlation summary
                     st.markdown("#### Correlation Summary")
@@ -3075,19 +3087,19 @@ else:
                                       line=dict(color=COLORS['gray'], width=2, dash='dash')))
             fig1.update_layout(title="Cumulative Returns: Portfolio vs Benchmark", height=350,
                               template='plotly_dark' if theme_dark else 'plotly_white')
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig1, width="stretch")
             
             fig3 = px.area(x=port_metrics['drawdown_series'].index, y=port_metrics['drawdown_series'].values,
                           title="Portfolio Drawdown", color_discrete_sequence=[COLORS['danger']])
             fig3.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=300)
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, width="stretch")
             
             # Rolling volatility
             rolling_vol = port_rets.rolling(20).std() * np.sqrt(252)
             fig_vol = px.line(x=rolling_vol.index, y=rolling_vol.values * 100, 
                              title="20-Day Rolling Volatility (%)")
             fig_vol.update_layout(template='plotly_dark' if theme_dark else 'plotly_white', height=300)
-            st.plotly_chart(fig_vol, use_container_width=True)
+            st.plotly_chart(fig_vol, width="stretch")
         
         # TAB: EXPORT
         with tabs[tab_idx]:
@@ -3131,5 +3143,8 @@ st.markdown(f"""
 
 if auto_refresh:
     import time
-    time.sleep(300)
-    st.rerun()
+    if 'last_refresh' not in st.session_state:
+        st.session_state.last_refresh = time.time()
+    if time.time() - st.session_state.last_refresh > 300:
+        st.session_state.last_refresh = time.time()
+        st.rerun()

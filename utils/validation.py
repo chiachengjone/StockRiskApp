@@ -527,7 +527,7 @@ def check_data_freshness(data: pd.DataFrame) -> Dict[str, Any]:
     # Determine status
     if days_old <= 1:
         result['status'] = 'current'
-        result['message'] = f"✓ Data current (last: {last_date.strftime('%Y-%m-%d')})"
+        result['message'] = f" Data current (last: {last_date.strftime('%Y-%m-%d')})"
     elif days_old <= 3:
         result['status'] = 'recent'
         result['message'] = f"Data is {days_old} days old (weekends/holidays)"
